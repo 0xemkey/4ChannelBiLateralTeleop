@@ -1,0 +1,408 @@
+Direct teleoperation runbook: left master -> right slave
+========================================================
+
+Separate from the HIL-RL simulation project. No IsaacLab, no ACT, no RL.
+
+One-time build (adds the telemetry topics to touch_haptics):
+
+  cd $HOME/HIL-RL/ros2_ws && \
+    source /opt/ros/humble/setup.bash && \
+    colcon build --base-paths src --cmake-args -DOPENHAPTICS_ROOT=/usr
+
+Do not run any HIL-RL Touch script at the same time as these. Only one
+OpenHaptics process may own a device.
+
+
+Order matters as of the 2026-09-02 calibration step: master, THEN bridge,
+THEN slave (not master/slave/bridge as in an earlier version of this
+project). The bridge captures each side's anchor as soon as it sees that
+device's first pose, and starting the slave last means a fresh master
+anchor is already on file by the time it comes up. See "Calibration file"
+below.
+
+
+### Terminal 1 - left master
+
+cd $HOME/HIL-RL && \
+$HOME/HIL-RL/projects/teleop_left_master_right_slave/scripts/run_master_left.sh
+
+
+### Terminal 2 - bridge, with force reflection on
+
+cd $HOME/HIL-RL && \
+SCALE=1.0 AXIS_MAP=x,y,z \
+MAX_OFFSET_M=0.12 MAX_SPEED_MPS=0.5 \
+FORCE_REFLECT=true REFLECT_GAIN=25.0 REFLECT_MAX_N=1.5 \
+REPORT=true \
+$HOME/HIL-RL/projects/teleop_left_master_right_slave/scripts/run_bridge.sh
+
+Drop FORCE_REFLECT for one-way teleoperation; it is off by default.
+
+
+### Terminal 3 - right slave (asks for sudo to rebind the serial device)
+
+cd $HOME/HIL-RL && \
+STIFFNESS_N_PER_M=35.0 DAMPING_N_S_PER_M=0.20 MAX_FORCE_N=1.5 \
+$HOME/HIL-RL/projects/teleop_left_master_right_slave/scripts/run_slave_right.sh
+
+The bridge waits until both devices publish before it starts, so it will
+not error out of order -- but the calibration file's freshness guarantee
+(see below) assumes master, then bridge, then slave, so stick to that order
+even though the bridge itself tolerates others. While waiting it prints,
+once a second:
+
+  waiting 4s for /touch_right/pose
+
+naming exactly which device has not appeared. After WAIT_TIMEOUT_S (default
+30) it exits 1 with a clear error. Set WAIT_FOR_DEVICES=false to skip the
+wait, or WAIT_TIMEOUT_S=0 to wait forever.
+
+Once both are up it prints:
+
+  both devices are publishing, teleoperation live
+
+If FORCE_REFLECT=true but nothing is subscribed to /touch_left/force_cmd, it
+warns at that point: the master is not running, so no force will be rendered.
+
+
+Calibration file
+-----------------
+
+As each side's anchor is captured (whenever that device's first pose
+arrives), the bridge writes it to a shared file:
+
+  CALIBRATION_FILE=~/dob_logs/teleop_calibration.json   (default, override
+                                                          on terminal 2)
+
+Contents: left_anchor, right_anchor, axis_map, axis_scale, and once both
+sides are known, mapped_left_anchor and right_minus_mapped_left -- the
+second is a diagnostic gap between where the master's frame implies the
+slave should start and where it actually is, useful data if the
+axis-mapping is ever in question again (see FOUR_CHANNEL_TODO.md).
+
+This never moves real hardware. Both devices stay wherever they physically
+are; the file only records where they were. It exists to (a) give
+diagnostic data on the master/slave anchor relationship and (b) let the
+simulated digital twins (run_master_left_sim.sh / run_slave_right_sim.sh)
+seed their starting joint state from this file instead of re-sampling the
+live pose topic a second time.
+
+
+C2 (slave position -> master) -- CONFIRMED ON REAL HARDWARE (2026-09-03)
+------------------------------------------------------------------------
+
+Off by default. Reverses the usual flow: the master's own target comes
+from the slave's actual position, so the master's spring pulls toward
+wherever the slave really is (a stalled/obstructed slave becomes felt on
+the master), instead of only rendering whatever force_cmd/reflection
+publishes.
+
+Terminal 1 (master) needs its own stiffness set, ADD:
+
+  ENABLE_C2=true \
+  LEFT_STIFFNESS_N_PER_M=15.0 LEFT_DAMPING_N_S_PER_M=0.10 \
+
+Terminal 2 (bridge) needs, ADD:
+
+  ENABLE_C2=true LEFT_MAX_OFFSET_M=0.15 \
+  LEFT_GRAVITY_COMP_N=0.45 LEFT_GRAVITY_AXIS=1 \
+
+Both must be set together or the master will get a commanded target with
+nothing to render it against (or vice versa). Confirmed exactly in
+simulation (sim/tests/test_c2_live.py under
+../../ros2_ws/src/touch_haptics/) AND live on real hardware 2026-09-03,
+after finding and fixing two real gaps: the master's own gravity pulling
+against +Y motion (fixed via LEFT_GRAVITY_COMP_N, same mechanism as the
+slave's SLAVE_GRAVITY_COMP_N) and too-tight a workspace clamp
+(LEFT_MAX_OFFSET_M raised 0.08 -> 0.15m). Neither value has had a
+dedicated controlled sweep yet -- see FOUR_CHANNEL_TODO.md for the full
+writeup.
+
+
+C1 (slave force -> master) -- SIM-VERIFIED ONLY, not run on real hardware
+---------------------------------------------------------------------
+
+Not part of this bridge at all -- a separate node, scripts/bilateral_4ch.py,
+relays the slave's disturbance-observer force estimate to the master's
+commanded external torque. Requires joint_space_control:=true on the
+master (a compile-time-gated torque-write path that does not exist in a
+real-hardware build of touch_slave -- see FOUR_CHANNEL_TODO.md's channel
+table) and an identified DOB model on the slave. Sim-confirmed via
+sim/tests/test_c1_relay_live.py; not attempted on real hardware. Do not
+enable this outside a sim context until the real-hardware test plan in
+FOUR_CHANNEL_TODO.md has been followed.
+
+
+### Terminal 4, optional - force on BOTH arms, side by side
+
+cd $HOME/HIL-RL && \
+$HOME/HIL-RL/projects/teleop_left_master_right_slave/scripts/monitor_forces.sh
+
+Prints what each node actually put on its motors this frame, after clamping:
+
+         fx     fy     fz     |F|             fx     fy     fz     |F|      track_err  est_load
+  ----------------------------------------------------------------------------------------------
+  LEFT  +0.000 +0.000 +0.000 | 0.000 N  RIGHT +0.550 +0.000 +0.137 | 0.567 N   0.0008 m   0.028 N
+  LEFT  -0.620 +0.000 -0.155 | 0.639 N  RIGHT +0.900 +0.000 +0.225 | 0.928 N   0.0210 m   0.735 N  <-- resisted
+
+  LEFT       force reflected onto your hand; zero until the slave is resisted
+  RIGHT      force driving the slave toward its target
+  track_err  how far the slave is from its target
+  est_load   track_err * STIFFNESS_N_PER_M, flagged past LOAD_FLAG_N
+
+A column reads STALE (node stopped?) if that device has not published for
+0.5 s, which is the fastest way to spot a node that died.
+
+Knobs:
+
+  RATE_HZ=5            print rate
+  HEADER_EVERY=20      reprint the column header every N rows, 0 disables
+  LOAD_FLAG_N=0.15     estimated load that earns the "resisted" marker
+  STIFFNESS_N_PER_M    must match terminal 2 or est_load is wrong
+
+Both force columns are COMMANDED values. Neither arm can measure force.
+
+
+### Terminal 5, optional - single-device torque detail
+
+cd $HOME/HIL-RL && \
+SIDE=right MODE=summary \
+$HOME/HIL-RL/projects/teleop_left_master_right_slave/scripts/monitor_torque.sh
+
+MODE=raw          echo the raw joint_torque topic
+MODE=temperature  echo motor temperature, 0..1 normalized
+SIDE=left         watch the master instead
+
+
+Controls
+--------
+
+  hold left button 2   clutch: slave freezes, reposition your hand,
+                       both sides re-anchor on release
+
+There is no gripper and no mode switching in this project. It is pure
+position teleoperation.
+
+
+Motion tuning
+-------------
+
+  SCALE=1.0            slave travel per unit of master travel
+  AXIS_MAP=x,y,z       master delta -> slave xyz, signs allowed
+  AXIS_SCALE=1.0,0.6,1.0        per-axis scale, applied AFTER the axis map
+  MAX_OFFSET_XYZ=0.09,0.055,0.07  per-axis travel limit in meters
+  MAX_OFFSET_MODE=axis          axis = per-axis, norm = original length clamp
+  MAX_SPEED_MPS=0.5    caps target travel speed, absorbs dropped messages
+  DEADBAND_M=0.0002    ignores encoder jitter at rest
+
+Vertical axis running out of range
+----------------------------------
+
+The Omni workspace is not a cube. It is roughly 160 mm wide but only about
+120 mm tall, so a 1:1 map that fits horizontally runs out of travel vertically.
+On a standard Touch the vertical axis is Y.
+
+AXIS_SCALE shrinks the vertical mapping so your full hand travel fits into the
+slave's shorter vertical range. Default 1.0,0.6,1.0 gives the vertical axis 60%
+of the horizontal ratio. Lower the middle number if it still runs out, raise it
+toward 1.0 if you have travel to spare.
+
+MAX_OFFSET_XYZ limits each axis independently. This replaces the old norm-based
+MAX_OFFSET_M clamp, which coupled the axes: running out of vertical travel used
+to shrink your horizontal motion at the same time, which reads as the slave
+mysteriously refusing to follow.
+
+  master delta       old norm clamp      new per-axis
+  (100, 90, 0) mm    (89, 80, 0) mm      (100, 54, 0) mm
+                     x lost 11 mm        x untouched, y clipped on its own
+
+Watch the totals when switching. Per-axis limits allow up to sqrt(3) times more
+combined reach than a norm clamp of the same value, because each axis gets its
+full budget at once instead of sharing one. Set the per-axis numbers BELOW the
+old MAX_OFFSET_M or an axis that was previously held back by its neighbours
+will suddenly overrun its workspace and stall against the limit. A stalled axis
+also reads as obstructed to the force reflection, so it will push back at you
+there as well.
+
+To go back to the original coupled behaviour:
+
+  MAX_OFFSET_MODE=norm MAX_OFFSET_M=0.12
+
+If the vertical axis is not merely short of range but sluggish or sagging, the
+problem is authority rather than mapping. The Omni is not gravity compensated,
+so the tracking spring spends itself holding the arm up before it can track.
+Add a constant upward bias:
+
+  SLAVE_GRAVITY_COMP_N=0.15    start here, raise until the arm stops sagging
+  SLAVE_GRAVITY_AXIS=1         1 = y = up on a standard Touch
+
+Raise it in 0.05 steps. Too much and the arm drifts upward on its own, which is
+the signal you have overshot. Terminal 3 also warns when an axis is being
+clipped:
+
+  slave y travel clipped at 55 mm. The master is asking for more range than
+  this axis is allowed.
+
+Run check_axes.sh to tell range problems from mapping problems before tuning.
+
+If the slave moves the wrong way on an axis, flip that axis in AXIS_MAP:
+
+  AXIS_MAP=-x,y,z      invert x only
+  AXIS_MAP=x,z,y       swap y and z
+  AXIS_MAP=-x,z,y      the mapping the HIL project used for its slave mirror
+
+If the slave feels sluggish or will not hold position, raise the spring in
+terminal 2:
+
+  STIFFNESS_N_PER_M=60.0 DAMPING_N_S_PER_M=0.35
+
+If it buzzes or oscillates, raise damping before lowering stiffness:
+
+  DAMPING_N_S_PER_M=0.5
+
+The Touch is rated about 0.88 N continuous and 3.3 N peak. MAX_FORCE_N=1.5 is
+deliberately above the continuous rating for a firmer hold; let the device rest
+between long sessions.
+
+
+Feeling the slave hit something
+-------------------------------
+
+With FORCE_REFLECT=true the master pushes back when the slave cannot reach its
+commanded target. You are feeling the slave's failure to track, not a sensed
+contact force. This hardware has no force sensor.
+
+The trigger:
+
+  1. bridge commands the slave to a target at 100 Hz
+  2. error = target - actual, from /touch_right/tracking_error
+  3. threshold = REFLECT_DEADBAND_M + REFLECT_VELOCITY_COMP * target_speed
+     the threshold rises with speed, because a slave always lags while it
+     accelerates; this is what keeps free motion feeling free
+  4. error above threshold -> force = REFLECT_GAIN * excess, capped at
+     REFLECT_MAX_N
+  5. direction is the error mapped back through AXIS_MAP and negated, so the
+     push opposes the hand driving into the constraint
+  6. hysteresis releases at threshold * REFLECT_RELEASE_RATIO, so error sitting
+     at the boundary cannot chatter the force on and off
+
+Force is republished every tick because the master zeroes force on commands
+older than stale_timeout_s (0.05 s). The bridge refuses to run reflection below
+40 Hz for that reason. Engaging the clutch decays the force to zero.
+
+Knobs:
+
+  REFLECT_GAIN=25.0           N per meter of excess error, the felt stiffness
+  REFLECT_DEADBAND_M=0.004    fixed part of the threshold
+  REFLECT_VELOCITY_COMP=0.05  threshold growth per unit of commanded speed
+  REFLECT_RELEASE_RATIO=0.6   hysteresis
+  REFLECT_MAX_N=1.5           clamp, keep <= the master's MAX_FORCE_N
+  REFLECT_ALPHA=0.2           low-pass, lower is smoother and more stable
+
+Master stiffness ladder
+-----------------------
+
+REFLECT_GAIN is the stiffness knob. Two clamps sit above it and both must have
+headroom or the gain does nothing at the top end:
+
+  REFLECT_MAX_N   in terminal 3, the bridge's own clamp
+  MAX_FORCE_N     in terminal 1, the master hardware clamp
+
+Raise them together. Force felt at the master, hand stationary:
+
+  excess error      gain 9      gain 25     gain 45
+      10 mm         0.07 N      0.19 N      0.34 N
+      20 mm         0.16 N      0.44 N      0.79 N
+      30 mm         0.25 N      0.69 N      1.24 N
+
+  softer   T1: MAX_FORCE_N=1.0   T3: REFLECT_GAIN=9.0  REFLECT_MAX_N=0.8
+  default  T1: MAX_FORCE_N=2.0   T3: REFLECT_GAIN=25.0 REFLECT_MAX_N=1.5
+  firmer   T1: MAX_FORCE_N=2.6   T3: REFLECT_GAIN=45.0 REFLECT_MAX_N=2.2
+
+The Touch is rated about 0.88 N continuous and 3.3 N peak. Anything above the
+continuous rating is fine per session but warms the motors; terminal 1 prints a
+warning when MAX_FORCE_N crosses it.
+
+Tuning:
+
+  free space feels draggy       -> raise REFLECT_DEADBAND_M to 0.008
+  resistance too weak to notice -> raise REFLECT_GAIN, then both clamps
+  wall feels mushy, not crisp   -> raise REFLECT_ALPHA to 0.3
+  buzzing or growling that
+  BUILDS while you hold still   -> the loop is unstable
+                                   lower REFLECT_GAIN first, then REFLECT_ALPHA
+
+Master pushes slave, slave error pushes master, your hand closes the loop.
+Soft master with stiff slave is stable; stiff both ways oscillates. Instability
+gets more likely as REFLECT_GAIN approaches the slave's STIFFNESS_N_PER_M
+(35.0), so if you push the gain high, raise the slave stiffness with it.
+
+With REPORT=true each line ends in the reflection state:
+
+  | reflect=ENGAGED threshold=0.0140m excess=0.0110m force=0.099N
+
+
+Reading torque
+--------------
+
+Short answer: the torque numbers you can read are COMMANDED, not measured.
+This hardware has optical encoders and no force or torque sensor.
+
+  /touch_right/applied_force       what we computed and set this frame
+  /touch_right/last_force          what the driver actually shipped, one frame
+                                   later, AFTER its own clamping and ramping
+  /touch_right/joint_torque        what the driver tells the 3 base motors
+  /touch_right/gimbal_torque       always zero, the gimbal is passive
+  /touch_right/joint_angles        genuinely measured
+  /touch_right/motor_temperature   driver thermal estimate, 0..1
+  /touch_right/tracking_error      target minus actual, meters
+
+OpenHaptics lists HD_CURRENT_JOINT_TORQUE under both its get and set parameter
+lists, which is the tell: it is the command channel to the motors.
+
+The only signal that reacts to the outside world is tracking_error. With a
+known spring gain:
+
+  estimated_load = STIFFNESS_N_PER_M * |target - actual|
+
+monitor_torque.sh prints that as est_load. It cannot tell your hand apart from
+friction, gravity, or a workspace limit, and it saturates once the error passes
+max_position_error_m (0.04 m) or the force hits max_force_n.
+
+For a true force reading you need an external load cell at the tip. There is no
+software path to it on this device.
+
+Full explanation, including the limits of the estimate:
+
+  $HOME/HIL-RL/projects/teleop_left_master_right_slave/README.md
+
+
+Checks
+------
+
+  ros2 topic hz /touch_left/pose            near 200 Hz
+  ros2 topic hz /touch_right/pose           near 200 Hz
+  ros2 topic info /touch_right/target_pose  Publisher count: 1 once bridged
+  ros2 topic echo /touch_right/applied_force
+
+If applied_force stays zero while the bridge is running, check that the right
+node received enable=true. The bridge republishes it every tick, so a zero
+usually means the slave never started or another process owns the device.
+
+
+Verifying without hardware
+---------------------------
+
+C1, C2, C3's core logic, the calibration file, and two real bugs found in
+bilateral_4ch.py (an oscillation-abort trip that used to false-trigger on
+any new signal, and a crashing manual_rearm) all have permanent pytest
+coverage that needs no physical device -- two touch_slave_sim instances
+stand in for the real master/slave:
+
+  cd $HOME/HIL-RL/ros2_ws && source install/setup.bash && \
+    cd src/touch_haptics/sim/tests && \
+    pytest test_c1_relay_live.py test_c2_live.py test_c3_live.py -v
+
+Run this after touching bridge_master_slave.py, bilateral_4ch.py, or
+touch_slave.cpp's Cartesian/DOB paths, before trusting a change on real
+hardware.

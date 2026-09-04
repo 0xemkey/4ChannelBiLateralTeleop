@@ -1,0 +1,359 @@
+{
+  "units": "N*m (real SI; J^T F with F in newtons)",
+  "caveat": "CAVEAT -- Cartesian excitation, not per-joint excitation.\n  These tools command a CARTESIAN force, so every excitation loads all three\n  joints at once through J^T. Per-joint excitation would need joint-space\n  commanding, which is gated off in touch_dob.hpp. Consequences:\n    * Friction estimates are biased toward whichever joint actually slipped\n      first; they are NOT clean single-joint values.\n    * Inertia estimates are correlated between joints. A joint that barely\n      moves in a given capture has its M_n poorly determined by that capture,\n      which is why per-joint condition numbers are reported alongside.\n  Do not quote any per-joint number from this suite without this caveat.",
+  "per_joint": {
+    "waist": {
+      "median_nm": 0.0,
+      "mean_nm": -0.014381396222222224,
+      "std_nm": 0.022779887673879763,
+      "min_nm": -0.0477220925,
+      "max_nm": 0.031200613000000002,
+      "n_pairs": 18,
+      "n_pairs_this_joint_slipped": 8
+    },
+    "shoulder": {
+      "median_nm": 0.00143137025,
+      "mean_nm": 0.008985292166666665,
+      "std_nm": 0.018083722871874305,
+      "min_nm": -0.0169637895,
+      "max_nm": 0.0353117685,
+      "n_pairs": 18,
+      "n_pairs_this_joint_slipped": 4
+    },
+    "elbow": {
+      "median_nm": 0.02361765175,
+      "mean_nm": 0.01647884175,
+      "std_nm": 0.012664303279312382,
+      "min_nm": -0.006378005,
+      "max_nm": 0.03119007,
+      "n_pairs": 18,
+      "n_pairs_this_joint_slipped": 12
+    }
+  },
+  "per_pair": [
+    {
+      "pose_id": 1,
+      "axis": "X",
+      "c_nm": [
+        -0.043017356,
+        -0.0006097585,
+        0.0008463315
+      ],
+      "q": [
+        -0.0573622475,
+        0.450053364,
+        0.922549784
+      ],
+      "slipped": [
+        "waist",
+        "waist"
+      ]
+    },
+    {
+      "pose_id": 1,
+      "axis": "Y",
+      "c_nm": [
+        0.0,
+        0.035258102,
+        0.03119007
+      ],
+      "q": [
+        -0.049343865,
+        0.449237302,
+        0.9209198355
+      ],
+      "slipped": [
+        "elbow",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 1,
+      "axis": "Z",
+      "c_nm": [
+        0.0034340489999999998,
+        -0.0169637895,
+        0.025333678
+      ],
+      "q": [
+        -0.049343865,
+        0.425163746,
+        0.904824108
+      ],
+      "slipped": [
+        "shoulder",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 2,
+      "axis": "X",
+      "c_nm": [
+        -0.0477220925,
+        -0.0077234005,
+        0.0098373405
+      ],
+      "q": [
+        -0.6614134309999999,
+        0.38395305,
+        1.070874929
+      ],
+      "slipped": [
+        "waist",
+        "waist"
+      ]
+    },
+    {
+      "pose_id": 2,
+      "axis": "Y",
+      "c_nm": [
+        0.0,
+        0.0296089355,
+        0.0277909055
+      ],
+      "q": [
+        -0.651339054,
+        0.37803666300000005,
+        1.061095238
+      ],
+      "slipped": [
+        "elbow",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 2,
+      "axis": "Z",
+      "c_nm": [
+        0.031200613000000002,
+        -0.008252701500000001,
+        0.011591802
+      ],
+      "q": [
+        -0.6418814660000001,
+        0.36518383050000003,
+        1.045203328
+      ],
+      "slipped": [
+        "waist",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 3,
+      "axis": "X",
+      "c_nm": [
+        -0.0386501135,
+        0.00017805700000000002,
+        0.0006339704999999999
+      ],
+      "q": [
+        -0.037007899999999996,
+        -0.219110295,
+        0.685800016
+      ],
+      "slipped": [
+        "waist",
+        "waist"
+      ]
+    },
+    {
+      "pose_id": 3,
+      "axis": "Y",
+      "c_nm": [
+        0.0,
+        0.0353117685,
+        0.02303788
+      ],
+      "q": [
+        -0.028783923,
+        -0.219518319,
+        0.6937460305
+      ],
+      "slipped": [
+        "elbow",
+        "shoulder"
+      ]
+    },
+    {
+      "pose_id": 3,
+      "axis": "Z",
+      "c_nm": [
+        0.001554525,
+        0.0077931135000000006,
+        0.025690481
+      ],
+      "q": [
+        -0.028783923,
+        -0.235023335,
+        0.697209686
+      ],
+      "slipped": [
+        "elbow",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 4,
+      "axis": "X",
+      "c_nm": [
+        -0.0419645275,
+        0.0026846835,
+        -0.0063036465
+      ],
+      "q": [
+        0.361238226,
+        0.2919430585,
+        0.828827858
+      ],
+      "slipped": [
+        "waist",
+        "waist"
+      ]
+    },
+    {
+      "pose_id": 4,
+      "axis": "Y",
+      "c_nm": [
+        0.0,
+        0.0343991615,
+        0.0265368885
+      ],
+      "q": [
+        0.365555823,
+        0.2917390315,
+        0.834532678
+      ],
+      "slipped": [
+        "elbow",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 4,
+      "axis": "Z",
+      "c_nm": [
+        -0.025516517500000002,
+        -0.010817450999999999,
+        0.0267874535
+      ],
+      "q": [
+        0.36021024,
+        0.276030004,
+        0.831272781
+      ],
+      "slipped": [
+        "elbow",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 5,
+      "axis": "X",
+      "c_nm": [
+        -0.041915415,
+        -0.002271925,
+        -0.006378005
+      ],
+      "q": [
+        0.3164175455,
+        -0.271949738,
+        0.711879194
+      ],
+      "slipped": [
+        "waist",
+        "waist"
+      ]
+    },
+    {
+      "pose_id": 5,
+      "axis": "Y",
+      "c_nm": [
+        0.0,
+        0.0329165325,
+        0.022452041
+      ],
+      "q": [
+        0.3205295355,
+        -0.287658766,
+        0.7169727685
+      ],
+      "slipped": [
+        "elbow",
+        "shoulder"
+      ]
+    },
+    {
+      "pose_id": 5,
+      "axis": "Z",
+      "c_nm": [
+        -0.016841969000000002,
+        0.00977838,
+        0.0241974235
+      ],
+      "q": [
+        0.31292235850000005,
+        -0.309692204,
+        0.7179914709999999
+      ],
+      "slipped": [
+        "waist",
+        "elbow"
+      ]
+    },
+    {
+      "pose_id": 6,
+      "axis": "X",
+      "c_nm": [
+        -0.04445347,
+        -0.00040181099999999997,
+        0.0011191625
+      ],
+      "q": [
+        -0.07010941200000001,
+        0.2260467485,
+        0.896878123
+      ],
+      "slipped": [
+        "waist",
+        "waist"
+      ]
+    },
+    {
+      "pose_id": 6,
+      "axis": "Y",
+      "c_nm": [
+        0.0,
+        0.030259731499999998,
+        0.0243189385
+      ],
+      "q": [
+        -0.06332463,
+        0.227066815,
+        0.903194159
+      ],
+      "slipped": [
+        "elbow",
+        "shoulder"
+      ]
+    },
+    {
+      "pose_id": 6,
+      "axis": "Z",
+      "c_nm": [
+        0.005027142,
+        -0.0094123695,
+        0.0279364365
+      ],
+      "q": [
+        -0.06332463,
+        0.2097256855,
+        0.9029904305
+      ],
+      "slipped": [
+        "elbow",
+        "elbow"
+      ]
+    }
+  ]
+}

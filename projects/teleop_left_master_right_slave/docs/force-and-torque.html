@@ -1,0 +1,737 @@
+<title>What the Touch Can Feel</title>
+<style>
+  /* ---- Light palette: complete token set on bare :root ---- */
+  :root {
+    --ground:      #F6F8FA;
+    --surface:     #FFFFFF;
+    --surface-sunk:#EDF1F5;
+    --ink:         #131A22;
+    --ink-soft:    #46535F;
+    --ink-faint:   #6C7A88;
+    --rule:        #D8E0E8;
+    --rule-strong: #B9C6D2;
+    --accent:      #0B6E99;
+    --accent-soft: #E3F0F7;
+    --measured:    #216B4E;
+    --measured-bg: #E2F1EA;
+    --commanded:   #9C4A15;
+    --commanded-bg:#F8EBE0;
+    --code-bg:     #EFF3F7;
+
+    --f-display: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    --f-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+
+  /* ---- Dark: redefine tokens only. Guarded so an explicit light choice wins. ---- */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1218;
+      --surface:     #151D25;
+      --surface-sunk:#1B242E;
+      --ink:         #E3E9EF;
+      --ink-soft:    #A8B6C3;
+      --ink-faint:   #7B8B99;
+      --rule:        #26323D;
+      --rule-strong: #3A4A58;
+      --accent:      #4FB0D8;
+      --accent-soft: #14303D;
+      --measured:    #5FBE93;
+      --measured-bg: #122C22;
+      --commanded:   #DE8B53;
+      --commanded-bg:#2E1D11;
+      --code-bg:     #101820;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1218;
+    --surface:     #151D25;
+    --surface-sunk:#1B242E;
+    --ink:         #E3E9EF;
+    --ink-soft:    #A8B6C3;
+    --ink-faint:   #7B8B99;
+    --rule:        #26323D;
+    --rule-strong: #3A4A58;
+    --accent:      #4FB0D8;
+    --accent-soft: #14303D;
+    --measured:    #5FBE93;
+    --measured-bg: #122C22;
+    --commanded:   #DE8B53;
+    --commanded-bg:#2E1D11;
+    --code-bg:     #101820;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 16.5px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 1.25rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 47rem; margin: 0 auto; }
+
+  /* ---- Masthead ---- */
+  header.masthead {
+    padding: 4rem 0 2rem;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 2.5rem;
+  }
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-family: var(--f-display);
+    font-size: clamp(2.1rem, 6vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.1rem;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 34rem;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.75rem;
+    margin-top: 2rem;
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+  }
+
+  /* ---- Sections ---- */
+  section { margin: 0 0 3.5rem; }
+  h2 {
+    font-family: var(--f-display);
+    font-size: 1.7rem;
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    text-wrap: balance;
+  }
+  h3 {
+    font-family: var(--f-body);
+    font-size: 1rem;
+    font-weight: 650;
+    letter-spacing: 0.005em;
+    margin: 2.25rem 0 0.6rem;
+  }
+  .qmark {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  p { margin: 0 0 1.05rem; }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  strong { font-weight: 650; }
+
+  /* ---- The verdict block: the answer, stated once, up front ---- */
+  .verdict {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: 1.15rem 1.3rem;
+    margin: 1.5rem 0 1.75rem;
+  }
+  .verdict .tag {
+    font-family: var(--f-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    white-space: nowrap;
+    padding-top: 0.12rem;
+  }
+  .verdict p { margin: 0; }
+  .verdict p + p { margin-top: 0.6rem; }
+
+  /* ---- Signal ledger: direction of travel is the real structure here ---- */
+  .ledger {
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    margin: 1.5rem 0;
+  }
+  .ledger-head {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr auto;
+    gap: 0.9rem;
+    padding: 0.7rem 1.1rem;
+    background: var(--surface-sunk);
+    border-bottom: 1px solid var(--rule);
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr auto;
+    gap: 0.9rem;
+    align-items: baseline;
+    padding: 0.75rem 1.1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .row:last-child { border-bottom: 0; }
+  .dir { font-family: var(--f-mono); font-size: 0.95rem; line-height: 1.4; }
+  .row.up .dir { color: var(--measured); }
+  .row.down .dir { color: var(--commanded); }
+  .attr {
+    font-family: var(--f-mono);
+    font-size: 0.83rem;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .attr small {
+    display: block;
+    font-family: var(--f-body);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-top: 0.15rem;
+  }
+  .chip {
+    font-family: var(--f-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    white-space: nowrap;
+    border-radius: 2px;
+  }
+  .chip.m { color: var(--measured); background: var(--measured-bg); }
+  .chip.c { color: var(--commanded); background: var(--commanded-bg); }
+
+  /* ---- Code / data panels ---- */
+  pre {
+    font-family: var(--f-mono);
+    font-size: 0.82rem;
+    line-height: 1.6;
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    margin: 1.3rem 0;
+  }
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.87em;
+    background: var(--code-bg);
+    padding: 0.1em 0.35em;
+    border-radius: 2px;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+
+  /* ---- Trigger steps: a real sequence, so numbering earns its place ---- */
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 1.5rem 0; }
+  ol.steps li {
+    counter-increment: s;
+    position: relative;
+    padding: 0 0 1.1rem 2.6rem;
+    border-left: 1px solid var(--rule);
+    margin-left: 0.75rem;
+  }
+  ol.steps li:last-child { border-left-color: transparent; padding-bottom: 0; }
+  ol.steps li::before {
+    content: counter(s);
+    position: absolute;
+    left: -0.75rem;
+    top: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: grid;
+    place-items: center;
+    background: var(--accent);
+    color: var(--surface);
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    border-radius: 50%;
+  }
+  ol.steps li.fire::before { background: var(--commanded); }
+  ol.steps strong { display: block; margin-bottom: 0.15rem; }
+  ol.steps p { margin: 0; color: var(--ink-soft); font-size: 0.95rem; }
+
+  ul.plain { padding-left: 1.15rem; margin: 1rem 0; }
+  ul.plain li { margin-bottom: 0.5rem; }
+
+  /* ---- Knob table ---- */
+  .tablewrap { overflow-x: auto; margin: 1.4rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 30rem; }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.9rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom-color: var(--rule-strong);
+  }
+  td:first-child { font-family: var(--f-mono); font-size: 0.82rem; white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; }
+
+  /* ---- Caution ---- */
+  .caution {
+    background: var(--commanded-bg);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--commanded);
+    padding: 1.05rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+  .caution h3 { margin: 0 0 0.4rem; color: var(--commanded); font-size: 0.95rem; }
+  .caution p:last-child { margin-bottom: 0; }
+
+  /* ---- Diagram ---- */
+  figure { margin: 1.75rem 0; }
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.25rem 1rem;
+    overflow-x: auto;
+  }
+  .diagram svg { display: block; width: 100%; min-width: 30rem; height: auto; }
+  /* SVG styling lives here, not in presentation attributes: var() is not
+     reliably substituted in presentation attributes across engines. */
+  .diagram .box { fill: var(--surface-sunk); stroke: var(--rule-strong); }
+  .diagram .gate { fill: var(--surface); stroke: var(--commanded); stroke-width: 1.5; }
+  .diagram .obst { fill: var(--commanded-bg); stroke: var(--commanded); }
+  .diagram .wire { fill: none; stroke: var(--rule-strong); stroke-width: 1.5; }
+  .diagram .wire-f { fill: none; stroke: var(--commanded); stroke-width: 1.8; }
+  .diagram .rule { stroke: var(--rule); stroke-width: 1; }
+  .diagram .t-title { font-family: var(--f-body); font-size: 14px; font-weight: 600; fill: var(--ink); }
+  .diagram .t-gate { font-family: var(--f-body); font-size: 12px; font-weight: 650; fill: var(--commanded); }
+  .diagram .t-note { font-family: var(--f-body); font-size: 11.5px; fill: var(--ink-faint); }
+  .diagram .t-mono { font-family: var(--f-mono); font-size: 10px; fill: var(--ink-faint); }
+  .diagram .t-mono-s { font-family: var(--f-mono); font-size: 9.5px; fill: var(--ink-soft); }
+  .diagram .t-warn { font-family: var(--f-mono); font-size: 10px; fill: var(--commanded); }
+  .diagram .t-key-m { font-family: var(--f-mono); font-size: 9.5px; fill: var(--measured); }
+  .diagram .t-key-c { font-family: var(--f-mono); font-size: 9.5px; fill: var(--commanded); }
+  .diagram .head-plain { fill: var(--rule-strong); }
+  .diagram .head-warn { fill: var(--commanded); }
+  figcaption {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    margin-top: 0.6rem;
+    font-style: italic;
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    margin-top: 4rem;
+    font-size: 0.88rem;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 34rem) {
+    .verdict { flex-direction: column; gap: 0.5rem; }
+    .row, .ledger-head { grid-template-columns: 1.2rem 1fr; }
+    .row .chip { grid-column: 2; justify-self: start; margin-top: 0.3rem; }
+    .ledger-head span:last-child { display: none; }
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Teleoperation notes / left master → right slave</p>
+  <h1>What the Touch Can Feel</h1>
+  <p class="standfirst">
+    Three questions about force on the Phantom Omni, answered from the driver headers
+    rather than from the datasheet: what the device senses, what it only pretends to,
+    and how the master ends up pushing back.
+  </p>
+  <div class="meta">
+    <span>Hardware · Phantom Omni / Touch</span>
+    <span>Stack · OpenHaptics HDAPI + ROS 2 Humble</span>
+    <span>Project · teleop_left_master_right_slave</span>
+  </div>
+</header>
+
+<section>
+  <span class="qmark">Question one</span>
+  <h2>Can we read the torque value?</h2>
+
+  <div class="verdict">
+    <span class="tag">PARTLY</span>
+    <p>
+      You can read a number called torque. It is the torque the driver is
+      <strong>commanding</strong>, not the torque the arm is experiencing. The
+      distinction changes what you are allowed to build on top of it.
+    </p>
+  </div>
+
+  <p>
+    There is no torque sensor on this hardware. The Phantom Omni has optical
+    encoders on its joints and nothing else. It measures <em>position</em>. It does
+    not measure force or torque anywhere, including at the stylus.
+  </p>
+
+  <p>
+    The giveaway is in <code>/usr/include/HD/hdDefines.h</code>:
+    <code>HD_CURRENT_JOINT_TORQUE</code> is listed under <strong>both</strong> the get
+    parameters and the set parameters. It is the command channel to the three base
+    motors. Reading it back tells you what you asked the motors to do.
+  </p>
+
+  <div class="ledger">
+    <div class="ledger-head">
+      <span>↕</span>
+      <span>Attribute</span>
+      <span>Nature</span>
+    </div>
+    <div class="row down">
+      <span class="dir">↓</span>
+      <span class="attr">HD_CURRENT_JOINT_TORQUE
+        <small>Torque commanded to the 3 base motors. Useful as a command log.</small></span>
+      <span class="chip c">Commanded</span>
+    </div>
+    <div class="row down">
+      <span class="dir">↓</span>
+      <span class="attr">HD_CURRENT_GIMBAL_TORQUE
+        <small>Reads zero here — the Omni gimbal is passive, not actuated.</small></span>
+      <span class="chip c">Commanded</span>
+    </div>
+    <div class="row down">
+      <span class="dir">↓</span>
+      <span class="attr">HD_CURRENT_FORCE
+        <small>The Cartesian force command, after clamping. Same information.</small></span>
+      <span class="chip c">Commanded</span>
+    </div>
+    <div class="row up">
+      <span class="dir">↑</span>
+      <span class="attr">HD_CURRENT_JOINT_ANGLES
+        <small>Genuinely sensed, straight from the encoders.</small></span>
+      <span class="chip m">Measured</span>
+    </div>
+    <div class="row up">
+      <span class="dir">↑</span>
+      <span class="attr">HD_MOTOR_TEMPERATURE
+        <small>Thermal estimate, 0–1 normalised. Worth watching on stiff runs. See caveat below.</small></span>
+      <span class="chip m">Probably modelled</span>
+    </div>
+  </div>
+
+  <h3>The one signal that responds to the outside world</h3>
+  <p>
+    Tracking error. The slave is commanded to a target through a spring of known
+    gain, so if it cannot arrive, something is resisting it:
+  </p>
+  <pre><code>estimated_load ≈ stiffness_n_per_m × |target − actual|</code></pre>
+  <p>
+    <code>monitor_torque.sh</code> prints this as <code>est_load</code>. It is an
+    inference from a commanded spring, not a reading, and it carries real limits: it
+    cannot separate your hand from friction, gravity, or the arm reaching a workspace
+    limit; it saturates once error passes <code>max_position_error_m</code> (0.04 m)
+    or force hits <code>max_force_n</code>; and the Omni's cable-drive stiction sets a
+    noise floor of a few tenths of a newton.
+  </p>
+</section>
+
+<section>
+  <span class="qmark">Question two</span>
+  <h2>Can we read it directly from the robot, not calculated?</h2>
+
+  <div class="verdict">
+    <span class="tag">NO</span>
+    <p>
+      The torque value never comes back from the robot. There is no channel for it to
+      come back on.
+    </p>
+  </div>
+
+  <p>
+    Sorting every attribute the driver defines by direction of travel makes the
+    interface obvious. <strong>Position goes up the wire, torque goes down it.</strong>
+  </p>
+
+  <pre><code>device → PC   encoder counts · button bits · safety and inkwell switches
+              (plus a pinch analog value on styli that have one)
+
+PC → device   motor DAC values for the 3 actuated base joints</code></pre>
+
+  <p>
+    That is the whole interface. When you call
+    <code>hdGetDoublev(HD_CURRENT_JOINT_TORQUE, …)</code> you are not querying the
+    robot at all — you are reading a variable in your own PC's memory that your own
+    code wrote a moment earlier, on its way to the DAC. The USB packet coming back
+    from the device has no torque field in it.
+  </p>
+
+  <p>
+    I also grepped the OpenHaptics headers for any current-sense, thermistor,
+    strain-gauge or load-cell symbol. Nothing. The sensing hardware is not there to
+    expose.
+  </p>
+
+  <div class="caution">
+    <h3>Caveat on motor temperature</h3>
+    <p>
+      <code>HD_MOTOR_TEMPERATURE</code> is listed above as measured, and that is
+      probably wrong. There is no temperature channel in the upstream data, and the
+      driver has everything it needs to compute an I²t estimate from commanded
+      current — so it is most likely modelled. The headers cannot settle it.
+    </p>
+    <p>
+      A clean test if it matters: from cold, with zero force commanded, back-drive the
+      arm hard by hand for a minute. A real sensor registers the warming. A model
+      shows nothing, because no current was commanded.
+    </p>
+  </div>
+
+  <h3>If you need true torque</h3>
+  <p>
+    Nothing software-only qualifies — everything below the hardware line is calculated
+    by definition.
+  </p>
+  <ul class="plain">
+    <li>
+      <strong>External F/T sensor at the tip.</strong> An ATI Nano17 or Nano25 between
+      stylus and tool, on its own DAQ, published as a separate topic. The only genuine
+      reading, and it measures contact at the tool rather than motor effort — usually
+      the thing you actually care about.
+    </li>
+    <li>
+      <strong>A different arm.</strong> No PHANToM/Touch variant has F/T sensing, so
+      upgrading within the family will not help. Franka Emika has real joint torque
+      sensors on all seven axes.
+    </li>
+    <li>
+      <strong>Disturbance observer.</strong> Model the arm's inertia, friction and
+      gravity, predict the motion the commanded torque should produce, attribute the
+      discrepancy to external load. Better than raw position error, still an estimate.
+    </li>
+  </ul>
+</section>
+
+<section>
+  <span class="qmark">Question three</span>
+  <h2>If the slave meets a constraint, can the master feel it?</h2>
+
+  <div class="verdict">
+    <span class="tag">YES</span>
+    <p>
+      This is bilateral teleoperation, and it now ships in the bridge behind
+      <code>FORCE_REFLECT=true</code>. The master runs the <code>touch_slave</code>
+      node rather than <code>touch_publisher</code> specifically so its force path is
+      live and ready to be fed.
+    </p>
+    <p>
+      What you feel is the slave's <em>failure to track</em>, not a sensed contact
+      force — the same inference as question one, rendered under your hand.
+    </p>
+  </div>
+
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 720 260" role="img" aria-label="Force reflection loop: master pose becomes a slave target; the slave's tracking error is compared against a speed-dependent threshold and, when exceeded, reflected back as force on the master.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path class="head-plain" d="M0,0 L10,5 L0,10 z"/>
+          </marker>
+          <marker id="arf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path class="head-warn" d="M0,0 L10,5 L0,10 z"/>
+          </marker>
+        </defs>
+
+        <!-- boxes -->
+        <rect class="box" x="14" y="34" width="150" height="58" rx="3"/>
+        <text class="t-title" x="89" y="58" text-anchor="middle">Left master</text>
+        <text class="t-mono" x="89" y="76" text-anchor="middle">your hand</text>
+
+        <rect class="box" x="285" y="34" width="150" height="58" rx="3"/>
+        <text class="t-title" x="360" y="58" text-anchor="middle">Bridge</text>
+        <text class="t-mono" x="360" y="76" text-anchor="middle">100 Hz</text>
+
+        <rect class="box" x="556" y="34" width="150" height="58" rx="3"/>
+        <text class="t-title" x="631" y="58" text-anchor="middle">Right slave</text>
+        <text class="t-mono" x="631" y="76" text-anchor="middle">spring + damper</text>
+
+        <!-- forward path -->
+        <line class="wire" x1="164" y1="63" x2="278" y2="63" marker-end="url(#ar)"/>
+        <text class="t-mono" x="221" y="53" text-anchor="middle">pose</text>
+        <line class="wire" x1="435" y1="63" x2="549" y2="63" marker-end="url(#ar)"/>
+        <text class="t-mono" x="492" y="53" text-anchor="middle">target</text>
+
+        <!-- obstruction -->
+        <rect class="obst" x="640" y="112" width="66" height="26" rx="3"/>
+        <text class="t-warn" x="673" y="129" text-anchor="middle">obstacle</text>
+        <line class="wire-f" x1="631" y1="92" x2="631" y2="112"/>
+
+        <!-- error return -->
+        <path class="wire" d="M631,92 L631,120 L556,120"/>
+        <path class="wire" d="M556,120 L478,120" marker-end="url(#ar)"/>
+        <text class="t-mono" x="517" y="112" text-anchor="middle">error</text>
+
+        <!-- trigger gate -->
+        <rect class="gate" x="300" y="100" width="170" height="46" rx="3"/>
+        <text class="t-gate" x="385" y="118" text-anchor="middle">trigger</text>
+        <text class="t-mono-s" x="385" y="135" text-anchor="middle">|error| &gt; threshold(speed)</text>
+
+        <!-- reflected force -->
+        <path class="wire-f" d="M300,123 L214,123 L214,178 L89,178 L89,99" marker-end="url(#arf)"/>
+        <text class="t-warn" x="150" y="170" text-anchor="middle">force_cmd</text>
+
+        <!-- free-space note -->
+        <text class="t-note" x="385" y="176" text-anchor="middle">below threshold → no force, free motion stays free</text>
+
+        <!-- baseline key -->
+        <line class="rule" x1="14" y1="214" x2="706" y2="214"/>
+        <text class="t-key-m" x="14" y="234">↑ measured: encoder positions only</text>
+        <text class="t-key-c" x="706" y="234" text-anchor="end">↓ commanded: every force in this loop</text>
+      </svg>
+    </div>
+    <figcaption>
+      The loop is closed through position error, not through a force sensor. Every
+      force in it originates on the PC.
+    </figcaption>
+  </figure>
+</section>
+
+<section>
+  <span class="qmark">Mechanism</span>
+  <h2>The trigger</h2>
+
+  <p>
+    The hard part is not producing force — it is deciding <em>when</em>. A slave always
+    lags its target a little while accelerating, so naive reflection makes empty space
+    feel syrupy. The threshold is therefore not a constant.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <strong>Slave is commanded to a target</strong>
+      <p>The bridge maps your master delta through the axis map and publishes it at 100 Hz.</p>
+    </li>
+    <li>
+      <strong>Error is measured against that target</strong>
+      <p>Preferably from <code>/touch_right/tracking_error</code>, computed inside the 200 Hz servo loop against the exact target the servo saw. Falls back to differencing our target with the reported pose.</p>
+    </li>
+    <li>
+      <strong>The threshold adapts to commanded speed</strong>
+      <p><code>threshold = deadband + velocity_comp × target_speed</code> — free-motion lag scales with speed, so the bar rises as you move faster. This is what keeps empty space free.</p>
+    </li>
+    <li class="fire">
+      <strong>Excess error engages reflection</strong>
+      <p>Beyond the threshold, force ramps as <code>gain × excess</code>, capped at <code>reflect_max_n</code>.</p>
+    </li>
+    <li>
+      <strong>Direction is mapped back and negated</strong>
+      <p>The error points where the slave still needs to go — into the obstruction. Inverting the axis map and negating puts the push against the hand that is driving into the constraint.</p>
+    </li>
+    <li>
+      <strong>Hysteresis releases lower than it engages</strong>
+      <p>Release at <code>threshold × 0.6</code>, so error hovering at the boundary cannot chatter the force on and off.</p>
+    </li>
+  </ol>
+
+  <p>
+    Two details that are easy to miss. Force is republished <em>every tick</em>, because
+    the master node zeroes force on commands older than <code>stale_timeout_s</code>
+    (0.05 s) — publishing only on change makes it stutter, and the bridge refuses to
+    run reflection below 40 Hz for that reason. And engaging the clutch decays the
+    force to zero: your hand is off task, and a live push would fight the
+    repositioning.
+  </p>
+
+  <h3>What it feels like</h3>
+  <p>
+    Blocking the slave with your hand is unmistakable, and the direction is correct.
+    But both devices max at roughly 0.88 N continuous, so expect "something is
+    stopping it" rather than a convincing hard wall. And because the trigger is a
+    tracking-error threshold, a workspace limit, heavy friction and a real obstacle
+    all feel identical.
+  </p>
+</section>
+
+<section>
+  <span class="qmark">Tuning</span>
+  <h2>Gains, and the loop that wants to oscillate</h2>
+
+  <p>
+    Master pushes slave, slave error pushes master, and your hand closes the loop.
+    Stiff on both ends oscillates — the classic bilateral failure — and the round-trip
+    delay of two ROS hops plus two servo loops eats the phase margin that would
+    otherwise save you.
+  </p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Knob</th><th class="num">Default</th><th>What it does</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>REFLECT_GAIN</td><td class="num">9.0 N/m</td><td>Force per metre of excess error. Roughly 0.25× the slave spring — not equal to it.</td></tr>
+        <tr><td>REFLECT_DEADBAND_M</td><td class="num">0.004 m</td><td>Fixed part of the threshold. Raise if free space feels draggy.</td></tr>
+        <tr><td>REFLECT_VELOCITY_COMP</td><td class="num">0.05 s</td><td>Threshold growth per unit of commanded speed.</td></tr>
+        <tr><td>REFLECT_RELEASE_RATIO</td><td class="num">0.6</td><td>Hysteresis. Lower means more reluctant to let go.</td></tr>
+        <tr><td>REFLECT_MAX_N</td><td class="num">0.8 N</td><td>Clamp before the master's own <code>max_force_n</code>.</td></tr>
+        <tr><td>REFLECT_ALPHA</td><td class="num">0.2</td><td>Low-pass. Lower is smoother and more stable.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The symptom to watch for is a buzz or growl that <em>builds</em> while you hold both
+    arms still in contact. That is the loop going unstable, and the fix is always to
+    lower <code>REFLECT_GAIN</code> first, then <code>REFLECT_ALPHA</code>. Soft master
+    with stiff slave is stable; stiff both ways growls.
+  </p>
+
+  <pre><code># Terminal 3, with reflection on
+FORCE_REFLECT=true REFLECT_GAIN=9.0 REFLECT_MAX_N=0.8 \
+SCALE=1.0 AXIS_MAP=x,y,z REPORT=true \
+$HOME/HIL-RL/projects/teleop_left_master_right_slave/scripts/run_bridge.sh</code></pre>
+
+  <p>
+    With <code>REPORT=true</code> each line ends in the reflection state, so you can
+    watch the trigger rather than guess at it:
+  </p>
+
+  <pre><code>| reflect=ENGAGED threshold=0.0140m excess=0.0110m force=0.099N</code></pre>
+</section>
+
+<footer>
+  <p>
+    Companion to <code>projects/teleop_left_master_right_slave/README.md</code> and
+    <code>RUNNING_SCRIPTS.txt</code>. Attribute claims were read from
+    <code>/usr/include/HD/hdDefines.h</code> on the build host; the trigger, hysteresis,
+    direction mapping and clamps were verified against the shipped bridge source.
+    Behaviour on the physical arms is not yet confirmed.
+  </p>
+</footer>
+
+</div>

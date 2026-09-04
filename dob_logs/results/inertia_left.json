@@ -1,0 +1,70 @@
+{
+  "units": {
+    "M_n": "kg*m^2",
+    "b": "N*m*s/rad",
+    "c": "N*m",
+    "basis": "REAL SI -- from J^T F with F in newtons; no HD_LAST_JOINT_TORQUE scale factor involved"
+  },
+  "gravity_subtracted": true,
+  "n_samples": 120825,
+  "savgol": {
+    "window": 51,
+    "order": 3,
+    "noncausal": true
+  },
+  "joints": {
+    "waist": {
+      "M_n_kg_m2": 0.0033693895900619468,
+      "b_visc": 0.06367205641770121,
+      "c_coulomb_nm": 0.01605721662846601,
+      "rms_residual_nm": 0.008422669050237227,
+      "r2": 0.8505667488631435,
+      "design_cond": 41.03618159519858,
+      "peak_qdot_rad_s": 0.7404601285617771,
+      "well_conditioned": true
+    },
+    "shoulder": {
+      "M_n_kg_m2": 0.0029451805084926568,
+      "b_visc": 0.01806396569206051,
+      "c_coulomb_nm": 0.017194969371945583,
+      "rms_residual_nm": 0.012819853883708739,
+      "r2": 0.36151749954297485,
+      "design_cond": 17.701426362954887,
+      "peak_qdot_rad_s": 1.0519065937258214,
+      "well_conditioned": true
+    },
+    "elbow": {
+      "M_n_kg_m2": 0.00023290761379819887,
+      "b_visc": 0.011857761132608325,
+      "c_coulomb_nm": 0.018896864433135138,
+      "rms_residual_nm": 0.011997555042982312,
+      "r2": 0.36726904254419457,
+      "design_cond": 18.397098940763556,
+      "peak_qdot_rad_s": 1.8881820157094718,
+      "well_conditioned": true
+    }
+  },
+  "tip_inertia_check": {
+    "spec_g": 45.0,
+    "per_axis": {
+      "x": {
+        "median_g": 75.34433630200783,
+        "p10_g": 49.753850572716644,
+        "p90_g": 101.89028068860755
+      },
+      "y": {
+        "median_g": 26.40924620598156,
+        "p10_g": 13.422363320690653,
+        "p90_g": 39.30970743231261
+      },
+      "z": {
+        "median_g": 21.835021111839655,
+        "p10_g": 17.51685689713369,
+        "p90_g": 99.94570082881428
+      }
+    },
+    "overall_median_g": 26.40924620598156,
+    "ratio_vs_spec": 0.5868721379107014,
+    "verdict": "PLAUSIBLE -- same order as the spec. This is a sanity check, not a validation: it cannot detect a fit that is wrong by less than about 3x, and the spec is a single tip figure while M_n is per joint."
+  }
+}

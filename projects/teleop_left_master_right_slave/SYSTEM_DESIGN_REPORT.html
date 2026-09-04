@@ -1,0 +1,919 @@
+<title>Bilateral Teleoperation Report</title>
+<style>
+  :root {
+    --ground:#F6F8FA; --surface:#FFFFFF; --sunk:#EDF1F5;
+    --ink:#131A22; --ink-soft:#46535F; --ink-faint:#6C7A88;
+    --rule:#D8E0E8; --rule-hi:#B9C6D2;
+    --fwd:#0B6E99; --fwd-bg:#E3F0F7;
+    --ret:#9C4A15; --ret-bg:#F8EBE0;
+    --ok:#216B4E; --ok-bg:#E2F1EA;
+    --code:#EFF3F7;
+    --f-d:Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+    --f-b:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --f-m:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#0D1218; --surface:#151D25; --sunk:#1B242E;
+      --ink:#E3E9EF; --ink-soft:#A8B6C3; --ink-faint:#7B8B99;
+      --rule:#26323D; --rule-hi:#3A4A58;
+      --fwd:#4FB0D8; --fwd-bg:#14303D;
+      --ret:#DE8B53; --ret-bg:#2E1D11;
+      --ok:#5FBE93; --ok-bg:#122C22;
+      --code:#101820;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0D1218; --surface:#151D25; --sunk:#1B242E;
+    --ink:#E3E9EF; --ink-soft:#A8B6C3; --ink-faint:#7B8B99;
+    --rule:#26323D; --rule-hi:#3A4A58;
+    --fwd:#4FB0D8; --fwd-bg:#14303D;
+    --ret:#DE8B53; --ret-bg:#2E1D11;
+    --ok:#5FBE93; --ok-bg:#122C22;
+    --code:#101820;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ground);color:var(--ink);font-family:var(--f-b);
+       font-size:16.5px;line-height:1.65;margin:0;padding:0 1.25rem 6rem;
+       -webkit-font-smoothing:antialiased}
+  .wrap{max-width:50rem;margin:0 auto}
+  header.mast{padding:3.5rem 0 2rem;border-bottom:2px solid var(--ink);margin-bottom:2.5rem}
+  .eyebrow{font-family:var(--f-m);font-size:.72rem;letter-spacing:.14em;
+           text-transform:uppercase;color:var(--fwd);margin:0 0 1rem}
+  h1{font-family:var(--f-d);font-size:clamp(2rem,5.5vw,2.9rem);line-height:1.08;
+     letter-spacing:-.02em;font-weight:600;margin:0 0 1rem;text-wrap:balance}
+  .stand{font-size:1.08rem;color:var(--ink-soft);margin:0;max-width:36rem}
+  .meta{display:flex;flex-wrap:wrap;gap:.4rem 1.5rem;margin-top:1.75rem;
+        font-family:var(--f-m);font-size:.74rem;color:var(--ink-faint)}
+  section{margin:0 0 3.25rem}
+  h2{font-family:var(--f-d);font-size:1.6rem;line-height:1.2;letter-spacing:-.015em;
+     font-weight:600;margin:0 0 .8rem;text-wrap:balance;
+     padding-bottom:.4rem;border-bottom:1px solid var(--rule)}
+  h3{font-size:1.02rem;font-weight:650;margin:2rem 0 .5rem}
+  h4{font-size:.92rem;font-weight:650;margin:1.4rem 0 .35rem;color:var(--ink-soft)}
+  .num{font-family:var(--f-m);font-size:.72rem;letter-spacing:.12em;
+       text-transform:uppercase;color:var(--ink-faint);display:block;margin-bottom:.4rem}
+  p{margin:0 0 1rem}
+  code{font-family:var(--f-m);font-size:.87em;background:var(--code);
+       padding:.1em .35em;border-radius:2px}
+  pre{font-family:var(--f-m);font-size:.8rem;line-height:1.6;background:var(--code);
+      border:1px solid var(--rule);padding:.95rem 1.1rem;overflow-x:auto;margin:1.2rem 0}
+  pre code{background:none;padding:0;font-size:1em}
+  ul,ol{padding-left:1.2rem;margin:.9rem 0}
+  li{margin-bottom:.45rem}
+  strong{font-weight:650}
+  .tw{overflow-x:auto;margin:1.3rem 0}
+  table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:31rem}
+  th,td{text-align:left;padding:.55rem .85rem .55rem 0;border-bottom:1px solid var(--rule);
+        vertical-align:top}
+  th{font-family:var(--f-m);font-size:.69rem;letter-spacing:.09em;text-transform:uppercase;
+     color:var(--ink-faint);border-bottom-color:var(--rule-hi)}
+  td:first-child{font-family:var(--f-m);font-size:.81rem}
+  td.n{font-variant-numeric:tabular-nums;white-space:nowrap}
+  figure{margin:1.7rem 0}
+  .dia{background:var(--surface);border:1px solid var(--rule);padding:1.2rem 1rem;
+       overflow-x:auto}
+  .dia svg{display:block;width:100%;height:auto}
+  figcaption{font-size:.84rem;color:var(--ink-faint);margin-top:.55rem;font-style:italic}
+  .dia .bx{fill:var(--sunk);stroke:var(--rule-hi)}
+  .dia .bx-f{fill:var(--fwd-bg);stroke:var(--fwd)}
+  .dia .bx-r{fill:var(--ret-bg);stroke:var(--ret)}
+  .dia .bx-hw{fill:var(--surface);stroke:var(--ink);stroke-width:1.6}
+  .dia .w{fill:none;stroke:var(--rule-hi);stroke-width:1.5}
+  .dia .wf{fill:none;stroke:var(--fwd);stroke-width:1.8}
+  .dia .wr{fill:none;stroke:var(--ret);stroke-width:1.8}
+  .dia .dash{stroke-dasharray:4 3}
+  .dia .hf{fill:var(--fwd)} .dia .hr{fill:var(--ret)} .dia .hp{fill:var(--rule-hi)}
+  .dia .t{font-family:var(--f-b);font-size:12.5px;font-weight:600;fill:var(--ink)}
+  .dia .ts{font-family:var(--f-b);font-size:11px;fill:var(--ink-soft)}
+  .dia .tm{font-family:var(--f-m);font-size:9.5px;fill:var(--ink-faint)}
+  .dia .tf{font-family:var(--f-m);font-size:9.5px;fill:var(--fwd)}
+  .dia .tr{font-family:var(--f-m);font-size:9.5px;fill:var(--ret)}
+  .note{background:var(--sunk);border-left:3px solid var(--fwd);padding:.9rem 1.15rem;margin:1.3rem 0}
+  .note p:last-child{margin-bottom:0}
+  .warn{background:var(--ret-bg);border-left:3px solid var(--ret);padding:.9rem 1.15rem;margin:1.3rem 0}
+  .warn p:last-child{margin-bottom:0}
+  .chip{font-family:var(--f-m);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;
+        padding:.15rem .45rem;border-radius:2px;white-space:nowrap}
+  .chip.f{color:var(--fwd);background:var(--fwd-bg)}
+  .chip.r{color:var(--ret);background:var(--ret-bg)}
+  .chip.o{color:var(--ok);background:var(--ok-bg)}
+  footer{border-top:1px solid var(--rule);padding-top:1.4rem;margin-top:3.5rem;
+         font-size:.86rem;color:var(--ink-faint)}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">System report · teleop_left_master_right_slave</p>
+  <h1>Bilateral Teleoperation Report</h1>
+  <p class="stand">
+    Two Phantom Omni haptic devices coupled as master and slave: how position
+    travels one way, how force comes back, the three control loops involved, and
+    what each design decision was measured against.
+  </p>
+  <div class="meta">
+    <span>Hardware · 2 × Phantom Omni / Touch</span>
+    <span>Stack · OpenHaptics HDAPI + ROS 2 Humble</span>
+    <span>Repo · HIL-RL/projects/teleop_left_master_right_slave</span>
+  </div>
+</header>
+
+<section>
+  <span class="num">1</span>
+  <h2>What the system does</h2>
+  <p>
+    The left Omni is held by the operator. The right Omni mirrors its motion. When
+    the right arm meets something it cannot push through, the left arm pushes back
+    against the operator's hand. That return path is what makes it
+    <em>bilateral</em> rather than a one-way remote control.
+  </p>
+  <p>
+    The whole thing is built on one asymmetry worth stating at the top, because
+    every design decision downstream follows from it: <strong>the hardware measures
+    position and only position.</strong> Each Omni has optical encoders on its
+    joints and no force or torque sensor anywhere. Every newton in this report is
+    a value computed on the PC and sent outward. Nothing measures what the arms
+    actually feel.
+  </p>
+  <p>
+    So "the master feels the obstacle" is shorthand. What the master actually
+    renders is an inference: the slave was commanded somewhere, encoders say it did
+    not arrive, therefore something is in the way.
+  </p>
+</section>
+
+<section>
+  <span class="num">2</span>
+  <h2>Structure and connections</h2>
+  <p>
+    Three processes. Two own hardware — one per device, because OpenHaptics allows
+    only one process per device — and a third couples them. All communication is
+    ROS 2 topics.
+  </p>
+
+  <figure>
+    <div class="dia">
+      <svg viewBox="0 0 760 340" role="img" aria-label="Topology: left master node and right slave node each own one device; the bridge subscribes to both poses and publishes the slave target and the master force command.">
+        <defs>
+          <marker id="hf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path class="hf" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="hr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path class="hr" d="M0,0 L10,5 L0,10 z"/></marker>
+          <marker id="hp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="hp" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+
+        <!-- operator + devices -->
+        <rect class="bx-hw" x="16" y="128" width="96" height="52" rx="3"/>
+        <text class="t" x="64" y="150" text-anchor="middle">Operator</text>
+        <text class="tm" x="64" y="167" text-anchor="middle">hand</text>
+
+        <rect class="bx-hw" x="146" y="118" width="112" height="72" rx="3"/>
+        <text class="t" x="202" y="142" text-anchor="middle">Left Omni</text>
+        <text class="ts" x="202" y="160" text-anchor="middle">master</text>
+        <text class="tm" x="202" y="177" text-anchor="middle">encoders + motors</text>
+
+        <rect class="bx-hw" x="632" y="118" width="112" height="72" rx="3"/>
+        <text class="t" x="688" y="142" text-anchor="middle">Right Omni</text>
+        <text class="ts" x="688" y="160" text-anchor="middle">slave</text>
+        <text class="tm" x="688" y="177" text-anchor="middle">encoders + motors</text>
+
+        <!-- nodes -->
+        <rect class="bx" x="146" y="34" width="112" height="46" rx="3"/>
+        <text class="t" x="202" y="53" text-anchor="middle">touch_slave</text>
+        <text class="tm" x="202" y="69" text-anchor="middle">as master, T1</text>
+
+        <rect class="bx" x="632" y="34" width="112" height="46" rx="3"/>
+        <text class="t" x="688" y="53" text-anchor="middle">touch_slave</text>
+        <text class="tm" x="688" y="69" text-anchor="middle">as slave, T2</text>
+
+        <rect class="bx-f" x="352" y="118" width="176" height="72" rx="3"/>
+        <text class="t" x="440" y="143" text-anchor="middle">bridge_master_slave</text>
+        <text class="ts" x="440" y="161" text-anchor="middle">mapping + reflection</text>
+        <text class="tm" x="440" y="178" text-anchor="middle">100 Hz, T3</text>
+
+        <!-- device <-> node (HDAPI, not ROS) -->
+        <line class="w dash" x1="202" y1="118" x2="202" y2="80" marker-end="url(#hp)"/>
+        <line class="w dash" x1="688" y1="118" x2="688" y2="80" marker-end="url(#hp)"/>
+        <text class="tm" x="210" y="102">HDAPI</text>
+        <text class="tm" x="696" y="102">HDAPI</text>
+
+        <!-- forward path -->
+        <path class="wf" d="M258,140 L345,140" marker-end="url(#hf)"/>
+        <text class="tf" x="301" y="132" text-anchor="middle">pose</text>
+        <path class="wf" d="M528,140 L625,140" marker-end="url(#hf)"/>
+        <text class="tf" x="576" y="132" text-anchor="middle">target_pose</text>
+
+        <!-- return path -->
+        <path class="wr" d="M625,168 L528,168" marker-end="url(#hr)"/>
+        <text class="tr" x="576" y="184" text-anchor="middle">tracking_error</text>
+        <path class="wr" d="M345,168 L258,168" marker-end="url(#hr)"/>
+        <text class="tr" x="301" y="184" text-anchor="middle">force_cmd</text>
+
+        <!-- mechanical loop -->
+        <path class="wr" d="M146,154 L119,154" marker-end="url(#hr)"/>
+        <path class="w" d="M112,140 L139,140" marker-end="url(#hp)"/>
+        <text class="tm" x="64" y="196" text-anchor="middle">grip</text>
+
+        <!-- monitors -->
+        <rect class="bx" x="330" y="252" width="220" height="44" rx="3"/>
+        <text class="t" x="440" y="271" text-anchor="middle">monitors, read-only</text>
+        <text class="tm" x="440" y="287" text-anchor="middle">monitor_forces · check_axes · monitor_torque</text>
+        <path class="w dash" x1="440" y1="190" x2="440" y2="252" d="M440,190 L440,252" marker-end="url(#hp)"/>
+        <path class="w dash" d="M688,190 L688,274 L550,274" marker-end="url(#hp)"/>
+        <path class="w dash" d="M202,190 L202,274 L330,274" marker-end="url(#hp)"/>
+
+        <line class="w" x1="16" y1="222" x2="744" y2="222" stroke-opacity="0.35"/>
+        <text class="tf" x="16" y="240">forward: position command</text>
+        <text class="tr" x="744" y="240" text-anchor="end">return: force</text>
+      </svg>
+    </div>
+    <figcaption>
+      The operator closes the outermost loop mechanically: rendered force moves the
+      hand, the hand moves the master, which changes the command.
+    </figcaption>
+  </figure>
+
+  <h3>Topics</h3>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Topic</th><th>Direction</th><th>Carries</th></tr></thead>
+    <tbody>
+      <tr><td>/touch_left/pose</td><td><span class="chip f">forward</span></td><td>Master tip position, from encoders. The only true input.</td></tr>
+      <tr><td>/touch_left/buttons</td><td><span class="chip f">forward</span></td><td>Clutch state (button 2).</td></tr>
+      <tr><td>/touch_right/target_pose</td><td><span class="chip f">forward</span></td><td>Where the slave should be. Bridge output.</td></tr>
+      <tr><td>/touch_right/pose</td><td><span class="chip r">return</span></td><td>Slave actual position. Feeds stall detection.</td></tr>
+      <tr><td>/touch_right/tracking_error</td><td><span class="chip r">return</span></td><td>target − actual, computed inside the slave's servo loop.</td></tr>
+      <tr><td>/touch_left/force_cmd</td><td><span class="chip r">return</span></td><td>Force to render on the master.</td></tr>
+      <tr><td>/touch_right/force_cmd</td><td><span class="chip f">forward</span></td><td>Optional gravity-compensation bias for the slave.</td></tr>
+      <tr><td>/touch_&lt;side&gt;/applied_force</td><td>telemetry</td><td>What was computed and sent to the motors.</td></tr>
+      <tr><td>/touch_&lt;side&gt;/last_force</td><td>telemetry</td><td>What the driver actually shipped, after its own clamping.</td></tr>
+      <tr><td>/touch_&lt;side&gt;/enable</td><td>control</td><td>Force output gate. Republished as a keep-alive.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <span class="num">3</span>
+  <h2>Three loops, three rates</h2>
+  <p>
+    Rate discipline is where most of the subtle behaviour lives. There are three
+    software rates plus one mechanical loop, and they are not the same number.
+  </p>
+
+  <figure>
+    <div class="dia">
+      <svg viewBox="0 0 700 250" role="img" aria-label="Nested loops: HDAPI servo at about 1 kHz inside each node, ROS publication at 200 Hz, bridge at 100 Hz, and the operator's mechanical loop at roughly 10 Hz.">
+        <rect class="bx" x="14" y="14" width="672" height="222" rx="4" fill-opacity="0.25"/>
+        <text class="t" x="30" y="36">Mechanical loop — operator's hand</text>
+        <text class="tm" x="30" y="52">closes through the grip · oscillates near 10 Hz when unstable</text>
+
+        <rect class="bx-f" x="40" y="66" width="620" height="156" rx="4" fill-opacity="0.4"/>
+        <text class="t" x="56" y="88">Bridge loop — 100 Hz</text>
+        <text class="tm" x="56" y="104">mapping, trigger, reflection · one ROS hop each way</text>
+
+        <rect class="bx" x="70" y="118" width="560" height="94" rx="4"/>
+        <text class="t" x="86" y="140">ROS publication — 200 Hz</text>
+        <text class="tm" x="86" y="156">pose and telemetry out of each device node</text>
+
+        <rect class="bx-hw" x="100" y="168" width="500" height="34" rx="3"/>
+        <text class="t" x="116" y="190">HDAPI servo callback — ~1 kHz, inside each device node</text>
+
+        <text class="tm" x="672" y="196" text-anchor="end">force reaches motors here</text>
+      </svg>
+    </div>
+    <figcaption>
+      Force is computed and delivered in the innermost loop, but the decision of
+      <em>what</em> force comes from the 100 Hz bridge two levels out.
+    </figcaption>
+  </figure>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>Loop</th><th class="n">Rate</th><th>Runs in</th><th>Job</th></tr></thead>
+    <tbody>
+      <tr><td>HDAPI servo</td><td class="n">~1 kHz</td><td>hdCallback, C++</td><td>Read encoders, compute spring force, write motors.</td></tr>
+      <tr><td>ROS publish</td><td class="n">200 Hz</td><td>node timer, C++</td><td>Publish pose, error, telemetry.</td></tr>
+      <tr><td>Bridge</td><td class="n">100 Hz</td><td>Python</td><td>Map master to target, decide reflection force.</td></tr>
+      <tr><td>Operator</td><td class="n">~10 Hz</td><td>physical</td><td>Unmodelled. This is the loop that oscillates.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="warn">
+    <p>
+      <strong>The staleness rule.</strong> The device node zeroes force on any
+      command older than <code>stale_timeout_s</code> = 50 ms. Both the target and
+      the reflected force must therefore be <em>republished every tick</em>, not
+      only when they change. A bridge publishing on change alone makes the slave
+      stutter and the reflected force cut in and out — and the bridge refuses to
+      run reflection below 40 Hz for exactly this reason.
+    </p>
+  </div>
+</section>
+
+<section>
+  <span class="num">4</span>
+  <h2>Forward path: master position to slave target</h2>
+  <p>
+    Eight stages, in order. Each exists to solve a specific failure observed on the
+    hardware.
+  </p>
+
+  <figure>
+    <div class="dia">
+      <svg viewBox="0 0 700 430" role="img" aria-label="Forward pipeline: encoders, anchor subtraction, deadband, axis map, per-axis scale, per-axis clamp, anchor add or absolute override, rate limit, publish.">
+        <defs>
+          <marker id="h2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="hf" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <g>
+          <rect class="bx-hw" x="230" y="10" width="240" height="34" rx="3"/>
+          <text class="t" x="350" y="32" text-anchor="middle">master encoders → pose (m)</text>
+
+          <rect class="bx-f" x="230" y="60" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="82" text-anchor="middle">delta = pose − left_anchor</text>
+          <text class="tm" x="480" y="82">captured at start / on clutch release</text>
+
+          <rect class="bx-f" x="230" y="110" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="132" text-anchor="middle">deadband 0.2 mm per axis</text>
+          <text class="tm" x="480" y="132">kills encoder jitter at rest</text>
+
+          <rect class="bx-f" x="230" y="160" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="182" text-anchor="middle">AXIS_MAP  master → slave axes</text>
+          <text class="tm" x="480" y="182">signed permutation, e.g. -x,z,y</text>
+
+          <rect class="bx-f" x="230" y="210" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="232" text-anchor="middle">AXIS_SCALE  per axis</text>
+          <text class="tm" x="480" y="232">1:1 unless an axis lacks travel</text>
+
+          <rect class="bx-f" x="230" y="260" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="282" text-anchor="middle">MAX_OFFSET_XYZ  per axis</text>
+          <text class="tm" x="480" y="282">independent, not vector length</text>
+
+          <rect class="bx-f" x="230" y="310" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="332" text-anchor="middle">+ right_anchor, or absolute</text>
+          <text class="tm" x="480" y="332">ABSOLUTE_AXES bypasses the anchor</text>
+
+          <rect class="bx-f" x="230" y="360" width="240" height="34" rx="3"/>
+          <text class="ts" x="350" y="382" text-anchor="middle">rate limit 0.5 m/s</text>
+          <text class="tm" x="480" y="382">absorbs a dropped message</text>
+
+          <text class="tf" x="350" y="418" text-anchor="middle">→ /touch_right/target_pose, republished every tick</text>
+        </g>
+        <g>
+          <line class="wf" x1="350" y1="44" x2="350" y2="58" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="94" x2="350" y2="108" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="144" x2="350" y2="158" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="194" x2="350" y2="208" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="244" x2="350" y2="258" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="294" x2="350" y2="308" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="344" x2="350" y2="358" marker-end="url(#h2)"/>
+          <line class="wf" x1="350" y1="394" x2="350" y2="404" marker-end="url(#h2)"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption>
+      Order matters: the axis map runs before scale and clamp, so those two are
+      expressed in slave axes — the frame whose workspace is the real constraint.
+    </figcaption>
+  </figure>
+
+  <h3>Anchor-relative versus absolute</h3>
+  <p>
+    By default the mapping is <strong>relative</strong>: the slave reproduces the
+    master's <em>displacement</em> from an anchor captured at startup, not its
+    absolute coordinate. This is what makes clutching possible — hold button 2, the
+    slave freezes, reposition your hand, release, and both anchors are retaken so
+    nothing jumps.
+  </p>
+  <p>
+    The cost is a permanent offset. Measured on this rig, with both arms parked:
+  </p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Axis</th><th class="n">Master</th><th class="n">Slave</th><th class="n">Offset</th></tr></thead>
+    <tbody>
+      <tr><td>x</td><td class="n">−20.1 mm</td><td class="n">+14.3 mm</td><td class="n">+34.5 mm</td></tr>
+      <tr><td>y</td><td class="n">−111.3 mm</td><td class="n">−121.2 mm</td><td class="n">−9.9 mm</td></tr>
+      <tr><td>z</td><td class="n">−20.8 mm</td><td class="n">−29.6 mm</td><td class="n">−8.8 mm</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    At that instant the slave's tracking error was 1.1 mm — it was going exactly
+    where commanded. The offset is the anchor difference, not a control failure.
+    <code>ABSOLUTE_AXES=y</code> makes Y command the master's absolute coordinate
+    instead, driving the height gap to zero at the cost of clutching on that axis.
+  </p>
+</section>
+
+<section>
+  <span class="num">5</span>
+  <h2>The slave controller</h2>
+  <p>
+    A PD law in Cartesian space, evaluated in the ~1 kHz servo callback. Position
+    error drives a spring; measured velocity provides damping.
+  </p>
+  <pre><code>err   = clamp(target − position, ±max_position_error_m)   // ±0.04 m
+force = stiffness · err − damping · velocity              // 35 N/m, 0.20 N·s/m
+force = force + force_cmd                                 // gravity comp bias
+force = clampNorm(force, max_force_n)                     // 1.5 N
+hdSetDoublev(HD_CURRENT_FORCE, force)</code></pre>
+  <p>
+    Three properties follow directly from this and explain most observed
+    behaviour:
+  </p>
+  <ul>
+    <li>
+      <strong>Authority is bounded twice.</strong> Error is clamped at 40 mm before
+      the spring sees it, so maximum spring output is 35 × 0.04 = 1.4 N regardless
+      of how far the target is. Then the total is clamped at 1.5 N.
+    </li>
+    <li>
+      <strong>Holding position costs force.</strong> The Omni is not gravity
+      compensated, so on the vertical axis the spring spends itself lifting the
+      arm before it can track. This is why the vertical axis runs short first, and
+      why the <code>force_cmd</code> bias input exists.
+    </li>
+    <li>
+      <strong>Tracking error is the only outward-facing signal.</strong> Position
+      comes from encoders, so error responds when the world resists. Everything
+      else in the force path is a value we chose.
+    </li>
+  </ul>
+</section>
+
+<section>
+  <span class="num">6</span>
+  <h2>Return path: the reflection controller</h2>
+  <p>
+    This is the part that took the most iteration, and the current design is the
+    third attempt. The naive version — force proportional to tracking error — does
+    not work, because free motion always carries error. The servo lags whenever the
+    target moves, so any error threshold either fires during free motion or misses
+    light contact.
+  </p>
+
+  <h3>The trigger: stall, not magnitude</h3>
+  <p>
+    An obstacle is not "large error". It is <strong>commanded to move and not
+    moving</strong>. Free motion has the slave travelling; an obstruction has it
+    stopped. Two independent conditions must both hold.
+  </p>
+
+  <figure>
+    <div class="dia">
+      <svg viewBox="0 0 700 300" role="img" aria-label="Decision flow: error above a speed-dependent threshold AND slave stalled, both required, then magnitude, direction, filtering, slew limit and clamps.">
+        <defs>
+          <marker id="h3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path class="hr" d="M0,0 L10,5 L0,10 z"/></marker>
+        </defs>
+        <rect class="bx" x="20" y="14" width="300" height="52" rx="3"/>
+        <text class="ts" x="34" y="36">condition A — error exceeds threshold</text>
+        <text class="tm" x="34" y="54">deadband + velocity_comp × commanded_speed</text>
+
+        <rect class="bx" x="380" y="14" width="300" height="52" rx="3"/>
+        <text class="ts" x="394" y="36">condition B — slave has stalled</text>
+        <text class="tm" x="394" y="54">slave_speed &lt; max(floor, ratio × commanded_speed)</text>
+
+        <path class="wr" d="M170,66 L170,88 L340,88 L340,104" marker-end="url(#h3)"/>
+        <path class="wr" d="M530,66 L530,88 L360,88 L360,104" marker-end="url(#h3)"/>
+
+        <rect class="bx-r" x="250" y="106" width="200" height="38" rx="3"/>
+        <text class="t" x="350" y="130" text-anchor="middle">A AND B → engaged</text>
+
+        <text class="tm" x="466" y="130">hysteresis: release at 0.6 × threshold</text>
+
+        <line class="wr" x1="350" y1="144" x2="350" y2="162" marker-end="url(#h3)"/>
+        <rect class="bx-r" x="200" y="164" width="300" height="34" rx="3"/>
+        <text class="ts" x="350" y="186" text-anchor="middle">magnitude = gain × excess, capped</text>
+
+        <line class="wr" x1="350" y1="198" x2="350" y2="216" marker-end="url(#h3)"/>
+        <rect class="bx-r" x="200" y="218" width="300" height="34" rx="3"/>
+        <text class="ts" x="350" y="240" text-anchor="middle">direction = −error, through inverse AXIS_MAP</text>
+
+        <line class="wr" x1="350" y1="252" x2="350" y2="268" marker-end="url(#h3)"/>
+        <text class="tr" x="350" y="286" text-anchor="middle">low-pass α=0.15 → slew 8 N/s → clamp 1.0 N → device clamp 1.2 N</text>
+      </svg>
+    </div>
+    <figcaption>
+      Both conditions are required. Dropping condition B is what made free motion
+      feel draggy in earlier versions.
+    </figcaption>
+  </figure>
+
+  <p>
+    The threshold is speed-dependent because free-motion lag scales with speed:
+    <code>threshold = deadband + velocity_comp × commanded_speed</code>. The bar
+    rises as you move faster, so a fast sweep through empty space stays free while
+    an obstruction at the same speed still trips it.
+  </p>
+
+  <h4>Measured effect of the stall gate</h4>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Scenario</th><th class="n">error</th><th class="n">cmd v</th><th class="n">slave v</th><th class="n">before</th><th class="n">after</th></tr></thead>
+    <tbody>
+      <tr><td>free, keeping up</td><td class="n">20 mm</td><td class="n">0.10</td><td class="n">0.095</td><td class="n">0.175 N</td><td class="n">0.000 N</td></tr>
+      <tr><td>fast free, big lag</td><td class="n">35 mm</td><td class="n">0.20</td><td class="n">0.170</td><td class="n">0.319 N</td><td class="n">0.000 N</td></tr>
+      <tr><td>slow free</td><td class="n">10 mm</td><td class="n">0.03</td><td class="n">0.028</td><td class="n">0.080 N</td><td class="n">0.000 N</td></tr>
+      <tr><td><strong>blocked, pushing</strong></td><td class="n">25 mm</td><td class="n">0.10</td><td class="n">0.001</td><td class="n">0.235 N</td><td class="n">0.235 N</td></tr>
+      <tr><td><strong>blocked, held still</strong></td><td class="n">30 mm</td><td class="n">0.00</td><td class="n">0.000</td><td class="n">0.331 N</td><td class="n">0.331 N</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Direction</h3>
+  <p>
+    The error vector points where the slave still needs to go — into the
+    obstruction. To resist the hand driving it there, that vector is negated and
+    passed through the <em>inverse</em> axis map back into master axes. Since the
+    forward map is a signed permutation, its inverse is
+    <code>master[src] = sign × slave[i]</code>. Verified to oppose hand motion for
+    identity and non-trivial maps alike, which is the case that would otherwise
+    fail silently.
+  </p>
+</section>
+
+<section>
+  <span class="num">7</span>
+  <h2>Stability, and one fix that failed</h2>
+  <p>
+    The outermost loop runs through the operator: rendered force moves the hand,
+    the hand moves the master, the master moves the target, the target changes the
+    error, the error changes the force. Negative feedback with roughly 20–30 ms of
+    round trip. It rings.
+  </p>
+  <p>
+    Three measures are in place, in descending order of confidence:
+  </p>
+  <ol>
+    <li><strong>Bounded gain.</strong> Reflection gain is kept well under the slave's spring constant. 12 N/m against 35 N/m.</li>
+    <li><strong>Slew limit.</strong> 8 N/s caps how fast force can change, bounding loop gain at high frequency without softening the steady-state wall the way a lower gain would.</li>
+    <li><strong>Filtered derivatives.</strong> Commanded speed and slave speed are both low-passed. Unfiltered, they injected encoder quantisation straight into the threshold and therefore into the force, scaling with gain.</li>
+  </ol>
+
+  <div class="warn">
+    <p>
+      <strong>Master-velocity damping is implemented but disabled, deliberately.</strong>
+      Damping is the textbook cure for a ringing teleoperation loop, and it made
+      things dramatically worse here. The velocity estimate is a low-passed
+      derivative whose force arrives after another round trip — late enough that it
+      lands in phase with the motion and pumps it. A closed-loop simulation of the
+      shipped code showed peak-to-peak force rising from 0.007 N to 0.647 N as
+      damping went 0 → 4 N·s/m, with hand excursion growing from 0.28 mm to
+      17.4 mm. The knob remains, defaulted to zero, because the simulation's hand
+      model is a guess.
+    </p>
+  </div>
+
+  <p>
+    The symptom to watch for is a buzz that <em>builds</em> while both arms are held
+    still in contact. That is the loop diverging, and the first response is to lower
+    the gain, then the filter constant.
+  </p>
+</section>
+
+<section>
+  <span class="num">8</span>
+  <h2>What is measured, what is inferred</h2>
+  <p>
+    Worth a section of its own, because the telemetry invites over-trust. In the
+    entire servo loop there are three reads from the hardware:
+  </p>
+  <pre><code>hdGetDoublev(HD_CURRENT_TRANSFORM, transform);    // position, from encoders
+hdGetDoublev(HD_CURRENT_VELOCITY, velocity);      // encoder derivative
+hdGetIntegerv(HD_CURRENT_BUTTONS, &amp;buttons);      // switch bits</code></pre>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Quantity</th><th>Nature</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>pose, joint_angles</td><td><span class="chip o">measured</span></td><td>Encoders. The only physical input.</td></tr>
+      <tr><td>tracking_error</td><td><span class="chip o">part measured</span></td><td>Measured position minus commanded target. The only signal that reacts to the world.</td></tr>
+      <tr><td>applied_force</td><td><span class="chip r">commanded</span></td><td>What we computed and set, copied out en route to the motors.</td></tr>
+      <tr><td>joint_torque</td><td><span class="chip r">commanded</span></td><td>Same command in joint space. Listed by OpenHaptics as both a get and a set parameter.</td></tr>
+      <tr><td>last_force</td><td><span class="chip r">commanded</span></td><td>Post-driver-pipeline. Its gap from applied_force reveals the driver rewriting us.</td></tr>
+      <tr><td>est_load</td><td><span class="chip r">inferred</span></td><td>stiffness × tracking_error. Cannot separate contact from friction, gravity, or a workspace limit.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    Four OpenHaptics capabilities can modify a force command after
+    <code>hdSetDoublev</code> and before the motors:
+    <code>HD_MAX_FORCE_CLAMPING</code>, <code>HD_FORCE_RAMPING</code>,
+    <code>HD_SOFTWARE_FORCE_LIMIT</code>, <code>HD_ONE_FRAME_LIMIT</code>. The node
+    now reports their state at startup and publishes <code>last_force</code> so the
+    difference is visible rather than assumed.
+  </p>
+</section>
+
+<section>
+  <span class="num">9</span>
+  <h2>How force and torque are obtained through HDAPI</h2>
+  <p>
+    Everything the system knows about force passes through a handful of HDAPI
+    calls, so it is worth walking the actual frame rather than describing it
+    abstractly.
+  </p>
+
+  <h3>The frame contract</h3>
+  <p>
+    HDAPI is frame-based. State reads and force writes are only valid between
+    <code>hdBeginFrame</code> and <code>hdEndFrame</code>, and the pair must run
+    inside a scheduler callback registered with
+    <code>hdScheduleAsynchronous</code> at the device servo rate. Reading device
+    state outside a frame returns stale or invalid data, which is why the node's
+    capability report is emitted from inside the first servo callback rather than
+    from the constructor.
+  </p>
+  <pre><code>// registered once, then invoked by the driver at ~1 kHz
+hdBeginFrame(hHD);
+
+  hdGetDoublev(HD_CURRENT_TRANSFORM, transform);   // 4x4, translation in [12..14]
+  hdGetDoublev(HD_CURRENT_VELOCITY, velocity);     // mm/s
+  hdGetIntegerv(HD_CURRENT_BUTTONS, &amp;buttons);
+
+  // ... compute force on the PC: spring, damper, external command ...
+
+  hdSetDoublev(HD_CURRENT_FORCE, force);           // N, device axes
+
+  hdGetDoublev(HD_LAST_FORCE, last_force);         // previous frame, post-pipeline
+  hdGetDoublev(HD_CURRENT_JOINT_TORQUE, jt);       // same command, joint space
+  hdGetDoublev(HD_MOTOR_TEMPERATURE, temp);
+
+hdEndFrame(hHD);                                   // driver pipeline runs here</code></pre>
+
+  <h3>Units and frames</h3>
+  <ul>
+    <li>
+      Position arrives in <strong>millimetres</strong> inside a column-major 4×4
+      transform. The node multiplies by <code>pos_scale = 0.001</code> to get
+      metres, then applies optional per-axis inversion and an X/Y swap so both
+      devices report in a consistent ROS frame.
+    </li>
+    <li>
+      Force is set in <strong>newtons</strong> in the same device axes. The node
+      therefore has to map its ROS-frame force back into device axes before
+      setting it — the inverse of the position mapping, applied in
+      <code>mapRosForceToDevice</code>. Getting this backwards would render force
+      in the wrong direction while every ROS topic still looked correct.
+    </li>
+    <li>
+      Torque is in <strong>newton-metres</strong> on the three base joints.
+    </li>
+  </ul>
+
+  <h3>Cartesian force versus joint torque</h3>
+  <p>
+    <code>HD_CURRENT_FORCE</code> and <code>HD_CURRENT_JOINT_TORQUE</code> are two
+    views of one command, related by the manipulator Jacobian the driver holds
+    internally:
+  </p>
+  <pre><code>tau = J(q)^T · F</code></pre>
+  <p>
+    Setting a Cartesian force lets the driver do that projection. Reading joint
+    torque back shows the result per motor. Nothing new enters between the two —
+    it is a change of coordinates on a value that originated on the PC. On a
+    device with a passive gimbal, as here, <code>HD_CURRENT_GIMBAL_TORQUE</code>
+    reads zero because those joints have no actuators.
+  </p>
+
+  <h3>Why none of it is a measurement</h3>
+  <p>
+    The decisive evidence is structural rather than empirical.
+    <code>HD_CURRENT_FORCE</code>, <code>HD_CURRENT_TORQUE</code>,
+    <code>HD_CURRENT_JOINT_TORQUE</code> and <code>HD_CURRENT_GIMBAL_TORQUE</code>
+    all appear in <em>both</em> the get-parameter and set-parameter lists in
+    <code>hdDefines.h</code>. They are command channels. A get on a command channel
+    returns what was last written to it.
+  </p>
+  <p>
+    Sorting the whole attribute set by direction of travel makes the interface
+    plain: the upstream packet carries encoder counts, button bits, safety and
+    inkwell switch states, and on equipped styli a pinch value. The downstream
+    packet carries motor DAC values for three actuated joints. There is no force
+    field in either direction, and a search of the headers finds no current-sense,
+    thermistor, strain-gauge or load-cell symbol to expose one.
+  </p>
+
+  <h3>What <code>HD_LAST_FORCE</code> adds</h3>
+  <p>
+    This is the one readback that carries information we did not already have.
+    <code>hdEndFrame</code> does not simply forward the value that was set; the four
+    enable/disable capabilities act on it first. So:
+  </p>
+  <pre><code>HD_CURRENT_FORCE  (read in-frame)  ==  what we set, our own variable
+HD_LAST_FORCE     (previous frame) ==  what the driver actually shipped
+
+difference                        ==  the driver's own clamping / ramping</code></pre>
+  <p>
+    Publishing both is what makes the <code>drift</code> column in Terminal 4
+    possible, and it is the only way to detect a silent ceiling: a
+    <code>MAX_FORCE_N</code> above the device nominal maximum would otherwise be
+    quietly reduced with no indication anywhere in the ROS graph.
+  </p>
+
+  <h3>Deriving load from position instead</h3>
+  <p>
+    Since force cannot be measured, the only route to an external-load figure is
+    inference from motion. The general form is a disturbance observer:
+  </p>
+  <pre><code>tau_external = tau_commanded − ( M(q)q̈ + C(q,q̇)q̇ + G(q) + F_friction )</code></pre>
+  <p>
+    What this system actually computes is the crudest member of that family, with
+    inertia, coriolis, gravity and friction all set to zero, valid only at rest:
+  </p>
+  <pre><code>est_load = stiffness_n_per_m × |tracking_error|</code></pre>
+  <p>
+    Its error floor is set by the Omni's cable-drive stiction — a few tenths of a
+    newton, against a usable range of 0.88 N continuous. Improving it means
+    modelling friction and inertia, and double-differentiating encoder position for
+    q̈ is noisy enough that the filtering required reintroduces the same lag that
+    destabilised the damping term in section 7. That trade is why the estimate was
+    left crude rather than half-improved.
+  </p>
+</section>
+
+<section>
+  <span class="num">10</span>
+  <h2>Terminals 4 and 5: building a comparison</h2>
+  <p>
+    The two monitor terminals exist because the control terminals cannot answer the
+    questions that came up during tuning. Terminal 3 prints what the bridge
+    <em>asked for</em>; that is the wrong side of two clamps. Diagnosing "is the
+    master doing what I think" needs the value that reached the motors, on both arms
+    at once, on one line.
+  </p>
+
+  <h3>Terminal 4 — <code>monitor_forces.sh</code></h3>
+  <p>
+    A read-only node subscribing to five topics and printing them as one aligned
+    row per sample.
+  </p>
+  <pre><code>       fx     fy     fz     |F|             fx     fy     fz     |F|      track_err  est_load
+LEFT  +0.000 +0.000 +0.000 | 0.000 N  RIGHT +0.550 +0.000 +0.137 | 0.567 N   0.0008 m   0.028 N
+LEFT  -0.620 +0.000 -0.155 | 0.639 N  RIGHT +0.900 +0.000 +0.225 | 0.928 N   0.0210 m   0.735 N  &lt;-- resisted</code></pre>
+  <p>
+    Design decisions behind it, each answering a question that arose in practice:
+  </p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Choice</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>reads <code>applied_force</code>, not the bridge's own value</td>
+        <td>It is captured after both clamps, so it shows what the motors were told rather than what was requested.</td>
+      </tr>
+      <tr>
+        <td>both arms on one line</td>
+        <td>The interesting fact is a relationship: LEFT should be zero while RIGHT drives, and go negative when RIGHT stalls. Two scrolling windows cannot show that.</td>
+      </tr>
+      <tr>
+        <td>sign is preserved, not just magnitude</td>
+        <td>The sign is the correctness check on the inverse axis map. A magnitude-only display would hide a reversed reflection entirely.</td>
+      </tr>
+      <tr>
+        <td><code>track_err</code> and <code>est_load</code> alongside</td>
+        <td>Places the one physically-responsive signal next to the two commanded ones, so over-trust is harder.</td>
+      </tr>
+      <tr>
+        <td><code>drift</code> column from <code>last_force</code></td>
+        <td>Surfaces the driver rewriting our command. Added once the four HDAPI capabilities were discovered.</td>
+      </tr>
+      <tr>
+        <td>staleness marker after 0.5 s</td>
+        <td>A frozen number and a dead node look identical otherwise. This was the fastest way to catch a node that quietly exited.</td>
+      </tr>
+      <tr>
+        <td>periodic header reprint</td>
+        <td>Column meaning stays available while scrolling, without a cursor-control TUI that would corrupt a piped log.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>Terminal 5 — <code>monitor_torque.sh</code></h3>
+  <p>
+    Single-device depth rather than two-device comparison. Three modes:
+    <code>summary</code> aggregates joint torque, gimbal torque, applied force,
+    tracking error and motor temperature into one line;
+    <code>raw</code> echoes the joint-torque topic directly; and
+    <code>temperature</code> watches the thermal estimate, which matters when
+    running above the continuous force rating. It also refuses to start with a
+    clear message when the device was launched without
+    <code>PUBLISH_TELEMETRY=true</code>, since the topics simply do not exist in
+    that case.
+  </p>
+  <p>
+    Its header states, unprompted, that every torque value shown is commanded. That
+    warning is in the script because the display is otherwise indistinguishable
+    from a sensor readout, and the number is easy to cite as one.
+  </p>
+
+  <h3><code>check_axes.sh</code> — separating two lookalike faults</h3>
+  <p>
+    Added when the slave stopped following on one axis. From the operator's chair a
+    mapping error and a range limitation are indistinguishable, and they have
+    opposite fixes. The tool compares commanded travel against achieved travel per
+    axis and classifies:
+  </p>
+  <div class="tw">
+  <table>
+    <thead><tr><th>follow ratio</th><th>Verdict</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td class="n">&gt; 0.7</td><td>tracking</td><td>none</td></tr>
+      <tr><td class="n">0.2 – 0.7</td><td>PARTIAL, cannot reach target</td><td>authority: stiffness, force headroom, gravity comp</td></tr>
+      <tr><td class="n">−0.2 – 0.2</td><td>STUCK, commanded but not moving</td><td>authority, or a workspace limit</td></tr>
+      <tr><td class="n">&lt; −0.2</td><td>INVERTED</td><td>flip that axis in AXIS_MAP</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    The classification is a pure function of commanded and actual travel, kept
+    separate from the ROS plumbing so it can be exercised without hardware. The
+    bridge carries a complementary readout — a <code>reach mm</code> summary marking
+    an axis <code>@LIMIT</code> when the bridge's own clamp is the ceiling and
+    <code>SHORT</code> when the slave simply could not get there. Between them, a
+    ceiling imposed by configuration is distinguishable from a physical one.
+  </p>
+
+  <div class="note">
+    <p>
+      All three monitors are strictly read-only: they subscribe and print, and
+      publish nothing. They can be started and stopped freely during a session
+      without disturbing the control loops or re-acquiring a device.
+    </p>
+  </div>
+</section>
+
+<section>
+  <span class="num">11</span>
+  <h2>Parameter reference</h2>
+  <div class="tw">
+  <table>
+    <thead><tr><th>Parameter</th><th class="n">Value</th><th>Where</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>MAX_FORCE_N</td><td class="n">1.2 N</td><td>T1 master</td><td>Hardware clamp on rendered force.</td></tr>
+      <tr><td>STIFFNESS_N_PER_M</td><td class="n">35 N/m</td><td>T2 slave</td><td>Tracking spring.</td></tr>
+      <tr><td>DAMPING_N_S_PER_M</td><td class="n">0.20</td><td>T2 slave</td><td>Velocity damping in the slave loop.</td></tr>
+      <tr><td>max_position_error_m</td><td class="n">0.04 m</td><td>T2 slave</td><td>Caps error the spring sees; bounds authority.</td></tr>
+      <tr><td>stale_timeout_s</td><td class="n">0.05 s</td><td>both nodes</td><td>Force zeroed on older commands.</td></tr>
+      <tr><td>AXIS_MAP</td><td class="n">x,y,z</td><td>T3 bridge</td><td>Signed permutation, master → slave.</td></tr>
+      <tr><td>AXIS_SCALE</td><td class="n">1,1,1</td><td>T3 bridge</td><td>Per-axis motion ratio.</td></tr>
+      <tr><td>MAX_OFFSET_XYZ</td><td class="n">.12,.11,.09</td><td>T3 bridge</td><td>Per-axis travel stops.</td></tr>
+      <tr><td>ABSOLUTE_AXES</td><td class="n">y</td><td>T3 bridge</td><td>Axes matching absolute height, not displacement.</td></tr>
+      <tr><td>REFLECT_GAIN</td><td class="n">12 N/m</td><td>T3 bridge</td><td>Felt stiffness of the wall.</td></tr>
+      <tr><td>REFLECT_MAX_N</td><td class="n">1.0 N</td><td>T3 bridge</td><td>Reflection clamp; must be ≤ MAX_FORCE_N.</td></tr>
+      <tr><td>REFLECT_DEADBAND_M</td><td class="n">0.004 m</td><td>T3 bridge</td><td>Fixed part of the trigger threshold.</td></tr>
+      <tr><td>REFLECT_STALL_RATIO</td><td class="n">0.5</td><td>T3 bridge</td><td>Stall test strictness.</td></tr>
+      <tr><td>REFLECT_ALPHA</td><td class="n">0.15</td><td>T3 bridge</td><td>Force low-pass.</td></tr>
+      <tr><td>REFLECT_SLEW_N_PER_S</td><td class="n">8 N/s</td><td>T3 bridge</td><td>Force rate limit.</td></tr>
+      <tr><td>REFLECT_MASTER_DAMPING</td><td class="n">0.0</td><td>T3 bridge</td><td>Disabled; destabilising as implemented.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <span class="num">12</span>
+  <h2>Verification status</h2>
+  <p>
+    Being explicit about this, since much of the above was validated in simulation
+    rather than on the arms.
+  </p>
+  <h4>Verified on hardware</h4>
+  <ul>
+    <li>Both devices publishing at expected rates; 1501 pose samples over 3 s from each.</li>
+    <li>Anchor offsets measured; slave tracking error at rest 1.1 mm on Y.</li>
+    <li>Driver builds clean; telemetry topics live.</li>
+  </ul>
+  <h4>Verified in test harness against shipped source</h4>
+  <ul>
+    <li>Axis map parsing, rejection of malformed input, forward/inverse round trip.</li>
+    <li>Reflection direction opposes hand motion under identity and permuted maps.</li>
+    <li>Stall gate: zero force in all free-motion cases, unchanged in contact.</li>
+    <li>Hysteresis engages and releases once, no chatter at the boundary.</li>
+    <li>Clutch re-anchoring produces exactly zero delta, so no jump on release.</li>
+    <li>Per-axis versus norm clamp behaviour; rate and force clamps.</li>
+    <li>Device staleness detection in the monitors.</li>
+  </ul>
+  <h4>Not yet confirmed</h4>
+  <ul>
+    <li>Reflection feel under real contact — force magnitudes are commanded, not measured.</li>
+    <li>Vibration root cause. Conservative gains shipped; whether it is contact-only or also free-motion is unresolved.</li>
+    <li>Driver capability states. Instrumented but not yet read, as the running nodes predate the rebuild.</li>
+    <li>Whether <code>HD_MOTOR_TEMPERATURE</code> is sensed or modelled.</li>
+  </ul>
+</section>
+
+<footer>
+  <p>
+    Companion documents: <code>README.md</code> for orientation,
+    <code>RUNNING_SCRIPTS.txt</code> for commands and tuning ladders,
+    <code>docs/force-and-torque.html</code> for the sensing limits in detail.
+    Control laws and parameter values in this report were read from
+    <code>ros2_ws/src/touch_haptics/src/touch_slave.cpp</code> and
+    <code>scripts/bridge_master_slave.py</code> as shipped; live figures were
+    sampled from the running devices.
+  </p>
+</footer>
+
+</div>
