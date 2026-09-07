@@ -26,7 +26,7 @@ Choose one session ID and use it unchanged in every terminal.
 1. Preflight:
 
    ```bash
-   cd /home/nural/HIL-RL
+   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
    projects/teleop_left_master_right_slave/experiment_launch/00_preflight.sh \
      --session dob_setup_001 --notes "DOB observation only"
    ```
@@ -34,7 +34,7 @@ Choose one session ID and use it unchanged in every terminal.
 2. Start the disabled left master:
 
    ```bash
-   cd /home/nural/HIL-RL
+   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
    projects/teleop_left_master_right_slave/experiment_launch/01_start_master.sh \
      --session dob_setup_001
    ```
@@ -42,7 +42,7 @@ Choose one session ID and use it unchanged in every terminal.
 3. Start the disabled right slave:
 
    ```bash
-   cd /home/nural/HIL-RL
+   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
    projects/teleop_left_master_right_slave/experiment_launch/02_start_slave.sh \
      --session dob_setup_001
    ```
@@ -50,7 +50,7 @@ Choose one session ID and use it unchanged in every terminal.
 4. Verify status before any arming:
 
    ```bash
-   cd /home/nural/HIL-RL
+   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
    projects/teleop_left_master_right_slave/experiment_launch/05_show_status.sh \
      --session dob_setup_001
    ```
@@ -64,7 +64,7 @@ Choose one session ID and use it unchanged in every terminal.
    separate hardware arming action. Its exact command is:
 
    ```bash
-   cd /home/nural/HIL-RL
+   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
    projects/teleop_left_master_right_slave/experiment_launch/03_start_position_bridge.sh \
      --session dob_setup_001 --arm-position
    ```
@@ -80,7 +80,7 @@ Choose one session ID and use it unchanged in every terminal.
 Normal shutdown and emergency software stop use the same targeted command:
 
 ```bash
-cd /home/nural/HIL-RL
+cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
 projects/teleop_left_master_right_slave/experiment_launch/99_stop_setup.sh \
   --session dob_setup_001
 ```
