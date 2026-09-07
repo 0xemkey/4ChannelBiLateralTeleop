@@ -5,14 +5,20 @@ system, assembled 2026-09-04 so this project can be built and run on a
 different computer (same physical Touch/Omni devices) without depending on
 anything else in the original `HIL-RL` repository.
 
-**Status at time of copy:** all four channels (C1 slave-force→master, C2
-slave-position→master, C3 master-position→slave, C4 master-force→slave)
-confirmed working simultaneously on real hardware 2026-09-03. Phase 1 bug
-fixes (see `projects/teleop_left_master_right_slave/docs/PHASE1_VERIFICATION_REPORT.md`)
-completed 2026-09-04 under sim/code-review-only verification — the real-hardware
-retest of item 1.4 (a one-off anomalous reading, investigated but not
-reproduced in sim) is the first thing to run once hardware is available
-again, using the script already written for it (see below).
+**Status as of this branch (`hardware-testing-2026-09`, 2026-09-07):** a
+startup/alignment state machine (`scripts/startup_alignment.py`) now gates
+every session — anchors are captured and validated automatically before
+teleoperation goes live, instead of the old "first message wins" capture.
+C2+C3 (position, both directions) and, separately, all four channels
+(C1+C2+C3+C4) together have been re-confirmed on real hardware today,
+2026-09-07 — see `07.09.2026 trials/fourchannel_graphs/` for that
+session's raw CSV and plots (position, force, per-channel tracking error,
+alignment error). **C1/C4 (the force-relay channels) are gated off by
+default** — `experiment_launch/04_start_force_relay.sh` deliberately
+refuses to run pending a formal separability qualification (Phase 2.7,
+see `FOUR_CHANNEL_TODO.md`'s roadmap); today's C1/C4 session ran by
+invoking `bilateral_4ch.py` directly, bypassing that gate as a deliberate,
+informed choice — do the same only if you understand why the gate exists.
 
 **Read `projects/teleop_left_master_right_slave/docs/SYSTEM_ARCHITECTURE.pdf`
 first** if you want to understand *how* the system works (channel
@@ -34,7 +40,7 @@ reference for what it's actually doing.
 │           ├── package.xml
 │           ├── include/touch_haptics/ <- touch_dob.hpp (DOB math), touch_force_estimate.hpp, dob_json_loader.hpp
 │           ├── src/                   <- touch_slave.cpp (the main node, real hardware), touch_publisher*.cpp
-│           ├── msg/                   <- ForceEstimate, DobDiagnostics, BilateralStatus
+│           ├── msg/                   <- ForceEstimate, DobDiagnostics, BilateralStatus, BridgeDiagnostics, CartesianControllerTelemetry
 │           ├── sim/                   <- hd_sim_api.cpp + arm_model.hpp (hardware-free simulator), sim/tests/ (pytest suite)
 │           ├── tools/                 <- standalone calibration/identification utilities (.cpp sources, not auto-built)
 │           ├── identification/        <- Python fitting scripts (gravity/inertia/friction) + README
@@ -43,12 +49,18 @@ reference for what it's actually doing.
 │   └── teleop_left_master_right_slave/
 │       ├── README.md                  <- original project overview + force-model background
 │       ├── RUNNING_SCRIPTS.txt        <- detailed runbook (terminal-by-terminal, all tuning knobs)
-│       ├── scripts/                   <- bilateral_4ch.py, bridge_master_slave.py, run_*.sh launch scripts, monitors
+│       ├── experiment_launch/         <- session-tracked launch wrapper: 00_preflight..99_stop_setup,
+│       │                                  01b/03b (C2 diagnostic variants), common.sh, OPERATOR_PROCEDURE.md
+│       ├── scripts/                   <- bilateral_4ch.py, bridge_master_slave.py, startup_alignment.py,
+│       │                                  log_phase2_scenario.py, plot_phase2_scenario.py,
+│       │                                  compute_c2_c3_metrics.py, plot_comparison.py, run_*.sh, tests/
 │       └── docs/                      <- FOUR_CHANNEL_TODO.md (full dev log), SYSTEM_ARCHITECTURE.pdf,
-│                                          PHASE1_VERIFICATION_REPORT.md, this session's other writeups
+│                                          PHASE1_VERIFICATION_REPORT.md, CONTROL_ARCHITECTURE_MAPPING.md
+├── 07.09.2026 trials/
+│   └── fourchannel_graphs/            <- real-hardware C1+C2+C3+C4 capture (push_hold_release), raw CSV + plots
 └── dob_logs/
     ├── results/                       <- identified DOB coefficients (gravity/inertia/friction fits, both arms)
-    └── teleop_calibration.json        <- master/slave anchor-pose calibration
+    └── teleop_calibration.json        <- master/slave anchor-pose calibration (updated 2026-09-07)
 ```
 
 This mirrors the original repo's relative layout on purpose
@@ -162,38 +174,70 @@ source "ros2_ws/install/setup.bash"
 
 ---
 
-## 5. Run — four terminals
+## 5. Run
 
-Full knob-by-knob detail lives in
-`projects/teleop_left_master_right_slave/RUNNING_SCRIPTS.txt`. Quick
-version (all commands run from inside this folder):
+Use `experiment_launch/` — a safety-tracked session wrapper (PID
+tracking, `--session` naming, `99_stop_setup.sh` for a clean shutdown) —
+rather than calling `scripts/run_*.sh` directly. All commands below run
+from inside `projects/teleop_left_master_right_slave/experiment_launch/`.
+Full knob-by-knob detail is in `../RUNNING_SCRIPTS.txt`.
 
 ```bash
-# Terminal 1 — master (left)
-projects/teleop_left_master_right_slave/scripts/run_master_left.sh
+# Terminal 1 -- preflight (creates the session directory)
+./00_preflight.sh --session my_session
 
-# Terminal 2 — bridge (position channels C2/C3,+ optional force reflection)
-SCALE=1.0 AXIS_MAP=x,y,z FORCE_REFLECT=true REFLECT_GAIN=25.0 REFLECT_MAX_N=1.5 REPORT=true \
-  projects/teleop_left_master_right_slave/scripts/run_bridge.sh
+# Terminal 2 -- master. Use 01_start_master.sh for C3-only (C2 off), or
+# 01b_start_master_c2_diagnostic.sh for a low-gain C2-enabled master
+# (stiffness=5 N/m, max_force=0.5N -- "low authority", not production gain)
+./01b_start_master_c2_diagnostic.sh --session my_session
 
-# Terminal 3 — slave (right)
-STIFFNESS_N_PER_M=35.0 DAMPING_N_S_PER_M=0.20 MAX_FORCE_N=1.5 \
-  projects/teleop_left_master_right_slave/scripts/run_slave_right.sh
+# Terminal 3 -- slave
+./02_start_slave.sh --session my_session
 
-# Terminal 4 — force relay (C1/C4), only after 1-3 are confirmed healthy
-python3 projects/teleop_left_master_right_slave/scripts/bilateral_4ch.py \
-  --architecture custom --w1 0.4 --w2 0 --w3 0 --w4 0.4
+# Terminal 4 -- bridge (C2+C3). Use 03_start_position_bridge.sh for C3-only,
+# or 03b_start_bridge_c2_diagnostic.sh for C2+C3 together (matches terminal 2)
+./03b_start_bridge_c2_diagnostic.sh --session my_session --arm-position
 ```
 
-Order matters for terminals 1-3: **master, then bridge, then slave** (the
-bridge captures each side's calibration anchor as it first sees that
-device's pose — see §3 above). Terminal 4 is independent of that ordering
-but needs 1 and 3's `force_ext_hat` topics already publishing.
+**The bridge does NOT go live on its own.** It runs a startup/alignment
+state machine (`../scripts/startup_alignment.py`): it waits for both
+devices' poses, confirms both are held still, captures anchors, validates
+the alignment is sane, then sits in `READY` until explicitly armed:
 
-**`RUNNING_SCRIPTS.txt`'s example commands use `$HOME/HIL-RL/...`
-paths from the original repo layout — replace that prefix with wherever
-you placed this folder** (or just run from inside this folder as shown
-above, using relative paths).
+```bash
+source /opt/ros/humble/setup.bash && source ../../../ros2_ws/install/setup.bash
+ros2 param set /touch_master_slave_bridge arm_teleop true
+```
+
+Watch terminal 4's log for `state=ACTIVE` before moving either arm — this
+step is easy to forget and looks like "nothing is happening" if skipped.
+
+```bash
+# Terminal 5 -- force relay (C1/C4). NOT started by experiment_launch/'s
+# own 04_start_force_relay.sh -- that script deliberately refuses to run
+# (see status note above). Run directly only once you understand why:
+python3 ../scripts/bilateral_4ch.py --architecture custom --w1 0.4 --w2 0 --w3 0 --w4 0.4
+```
+`--w2 0 --w3 0` is deliberate: C2/C3 are already driven by the bridge
+(terminal 4); this node handles C1/C4 only. Watch for `OSCILLATION ABORT`
+in its output — recover with
+`ros2 param set /bilateral_4ch manual_rearm true`. Keep this terminal in
+the foreground so you can Ctrl-C it directly.
+
+```bash
+# Terminal 6 -- optional: log a capture + auto-generate plots
+python3 ../scripts/log_phase2_scenario.py --scenario push_hold_release \
+  --repeat 1 --out-dir ~/dob_logs/my_capture --countdown-s 3
+```
+See `../scripts/compute_c2_c3_metrics.py` for segmented RMSE/MAE/lag/
+correlation metrics on a capture, and
+`07.09.2026 trials/fourchannel_graphs/` for a worked real-hardware example
+of both a capture and its generated plots.
+
+```bash
+# stop everything cleanly
+./99_stop_setup.sh --session my_session
+```
 
 ---
 
@@ -211,15 +255,15 @@ instances stand in for the real master/slave throughout.
 
 ---
 
-## 7. First thing to do once real hardware is available again
+## 7. Older open item, still unresolved
 
 `projects/teleop_left_master_right_slave/scripts/repro_dob_restart_anomaly.py`
 — written and syntax-checked, **never executed** (no hardware access when
-it was written). Restarts only the master node ~25 times with nothing
-touching either arm, checking whether a single 2.79 N·m anomalous reading
-seen once on 2026-09-03 (investigated in Phase 1, sim-ruled-out as
-filter-state or DOB-math related, real-hardware-specific device re-init
-still an open hypothesis) reproduces from a restart alone:
+it was written, and not revisited since). Restarts only the master node
+~25 times with nothing touching either arm, checking whether a single
+2.79 N·m anomalous reading seen once on 2026-09-03 (investigated in Phase
+1, sim-ruled-out as filter-state or DOB-math related, real-hardware-specific
+device re-init still an open hypothesis) reproduces from a restart alone:
 
 ```bash
 python3 projects/teleop_left_master_right_slave/scripts/repro_dob_restart_anomaly.py \
@@ -239,6 +283,7 @@ already running — this script only restarts the master. Full context in
 | `projects/teleop_left_master_right_slave/docs/SYSTEM_ARCHITECTURE.pdf` | mechanism, math, diagrams, verification proofs — the "how does this work" reference |
 | `projects/teleop_left_master_right_slave/docs/FOUR_CHANNEL_TODO.md` | full chronological development log — every bug found, every decision made, with dates |
 | `projects/teleop_left_master_right_slave/docs/PHASE1_VERIFICATION_REPORT.md` | 2026-09-04 bug-fix verification report (PASS/FAIL per item) |
+| `projects/teleop_left_master_right_slave/docs/CONTROL_ARCHITECTURE_MAPPING.md` | full architecture trace + the paper-vs-project channel-naming mismatch (paper's C1-C4 ≠ this project's C1-C4) |
 | `projects/teleop_left_master_right_slave/README.md` | original project overview, force-model background |
 | `projects/teleop_left_master_right_slave/RUNNING_SCRIPTS.txt` | the detailed runbook — every environment variable, every tuning knob, troubleshooting |
 | `ros2_ws/src/touch_haptics/identification/README.md` | how the gravity/inertia/friction fits were produced, if re-identification is ever needed |
@@ -247,14 +292,23 @@ already running — this script only restarts the master. Full context in
 
 ## 9. Update policy for this copy
 
-This folder is a **point-in-time snapshot**, taken 2026-09-04 after Phase
-1's sim/code-review-only verification. It is not a live symlink or a git
-submodule of the original `HIL-RL` repository — changes made in one do not
-automatically appear in the other. Per the plan agreed with the project
-owner: after the next real-hardware session (Phase 1.4's real repro
-attempt, then Phases 2-3 of the fine-tuning task), **both this folder and
-the original `HIL-RL/projects/teleop_left_master_right_slave` /
-`HIL-RL/ros2_ws` tree will be updated together**, so they do not silently
-drift apart. If you're reading this later and only one of the two has
-been updated, treat the more recently modified one as authoritative and
-re-sync the other before trusting either blindly.
+This folder is **its own git repository**
+(`github.com/0xemkey/4ChannelBiLateralTeleop`), independent of the main
+`HIL-RL` repo — they are not linked by a submodule or symlink, so changes
+made in one never automatically appear in the other. It is not a
+point-in-time snapshot anymore: `main` still reflects the original
+2026-09-04 copy, but active work now happens on dated feature branches
+(e.g. `hardware-testing-2026-09`), each carrying a full re-sync of
+`projects/teleop_left_master_right_slave/` and `ros2_ws/src/touch_haptics/`
+against the live `HIL-RL` source at the time the branch was cut, verified
+file-for-file identical (`diff -rq`) before pushing — not assumed.
+
+**If you edit this repo on another machine and want those changes back on
+the original `HIL-RL` development machine (or vice versa):** this is
+ordinary git — commit and push from wherever you made the change, then
+`git pull` (or `git fetch` + `git checkout <branch>`) on the other side.
+There is no separate sync script; the two only drift if someone edits
+code in `HIL-RL/projects/teleop_left_master_right_slave` or
+`HIL-RL/ros2_ws/src/touch_haptics` directly and forgets to re-sync this
+copy afterward (or the reverse). When in doubt, `diff -rq` the two trees
+before trusting either as current.
