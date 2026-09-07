@@ -123,4 +123,5 @@ exec ros2 run touch_haptics touch_slave --ros-args \
   -r force_ext_hat:=/touch_left/force_ext_hat \
   -r motor_temperature:=/touch_left/motor_temperature \
   -r tracking_error:=/touch_left/tracking_error \
-  -r dob_diagnostics:=/touch_left/dob_diagnostics
+  -r dob_diagnostics:=/touch_left/dob_diagnostics \
+  -r cartesian_controller_telemetry:=/touch_left/cartesian_controller_telemetry

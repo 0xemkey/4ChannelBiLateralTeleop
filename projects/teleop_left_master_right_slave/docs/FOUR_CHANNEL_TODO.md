@@ -1140,6 +1140,237 @@ combined felt-quality pass, starting at the current `w1=w4=0.4` weights.
 
 ---
 
+## 2026-09-04 — Kd overdamping comment corrected; sim-only C1/C4 Cartesian-relay performance baseline
+
+Two separate threads, both sim-only, no real hardware touched.
+
+**1. Corrected a stale code comment, no gain change.** `touch_slave.cpp`'s
+joint-space `Kd` comment claimed "~2x overdamped"; verified against real
+`inertia_left.json` `M_n` values it is actually 6-8x (waist 7.86x, shoulder
+6.18x, elbow 6.31x, via `Kd_crit = 2*sqrt(Kp*M_n)`). Re-ran
+`test_joint_space_write_gated.py` to check whether this over-damping was
+related to the historical "C4 test failing at -60% to -75%" finding from
+2026-09-03 above -- **it is not**: that test currently passes clean at
+85.2% closed_fraction with these same `Kd` values unchanged, confirming
+the 2026-09-03 diagnosis (test-methodology bug, not a gains bug) still
+holds. Comment fixed in place; no `Kp`/`Kd` changed.
+
+**2. New finding: `applied_force` silently omits the C1/C4 relay's
+contribution.** `state_.applied_force_n = force_ros` (`touch_slave.cpp`
+~line 1301) is captured from `force_ros`, computed BEFORE the "C1/C4-onto-
+Cartesian relay" block runs (~lines 1189-1254, which only mutates the
+separate `force_device` array). The actual `hdSetDoublev(HD_CURRENT_FORCE,
+...)` write DOES include the relay's contribution (confirmed via
+`TOUCH_DIAG_CARTESIAN_RELAY=1`'s stderr trace), so the device itself
+renders correctly -- but the `applied_force` ROS topic, which this
+project's own tooling (`log_phase2_scenario.py`'s docstring, `monitor_
+forces.sh`) documents as "the REAL rendered Cartesian force... the haptic
+force the operator actually feels," is stale and reports the PRE-relay
+value whenever C1/C4 is active. `last_force` (reads `HD_LAST_FORCE`, the
+driver's own post-write readback, one frame lagged) is correct and does
+include it -- confirmed by direct comparison against the relay math trace.
+**Any Phase 2 capture taken with C1/C4 active would show an incomplete
+`applied_force` trace for the receiving arm.** Not fixed here (touches
+shared telemetry code, flagging rather than silently patching); the fix is
+straightforward (fold the relay's Cartesian delta into `force_ros`, or
+just document the caveat) but wasn't applied without checking first.
+
+**3. Sim-only baseline of the ACTIVE C1/C4 Cartesian-relay path**
+(`sim/tests/diag_c1c4_cartesian_baseline.py`, new). Two `touch_slave_sim`
+instances, `joint_space_control:=false` (production default), one side
+gets a wall-contact model, driven with a controlled 0.6N ramp-hold-release
+push; `bilateral_4ch.py` relays with position weights zeroed to isolate
+the force channels. Each case run at target weight vs weight=0 to isolate
+the relay's own contribution on the peer's real `last_force`.
+
+**Independently reproduces the exact deadband-cliff mechanism the
+2026-09-03 real-hardware session found empirically** (that session's
+`w1=0.15` read zero, `w1=0.4` gave signal) -- strong convergent validation
+that this sim harness is trustworthy for further C1/C4 tuning without
+spending real-hardware time. This session's own sweep, at this scenario's
+specific pose/push-axis:
+
+| weight | C1 peer force (N) | C4 peer force (N) |
+|---|---|---|
+| 0.0 (control) | 0.000 | 0.000 |
+| 0.3 | -- | 0.000 |
+| 0.4 | 0.000 | -- |
+| 0.5 | 0.000 | 0.222 |
+| 0.6 | 0.137 | 0.267 |
+| 0.7 | 0.167 | 0.311 |
+| 0.8 | 0.199 | 0.355 |
+| 0.9 | 0.236 | 0.400 |
+| 1.0 | 0.277 | 0.444 |
+
+**The last real-hardware-used weights (`w1=0.5`, and `w4=0.3` from the
+`4ch_safe` preset) both sit AT OR BELOW the cliff in this scenario** --
+zero relayed force for a firm 0.6N contact. Even at full weight (1.0),
+only 46% (C1) / 74% (C4, magnitude) of the source's true force reaches the
+peer -- meaningful attenuation persists well above the cliff, from the two
+stacked deadbands plus the Cartesian round-trip conversion and re-clamp.
+
+**Torque headroom, measured (not theoretical) from the source node's own
+truth-CSV `tau_cmd` during the hold window, 0.6N contact alone:** shoulder
+reaches 82-89% of its `dob_torque_f_max_n=0.6N` ceiling on BOTH arms from
+contact alone, before any relay signal is added -- consistent with why C1
+already excludes shoulder (`--c1-disable-joints` default), but **C4 has no
+equivalent mask and relays shoulder's raw signal regardless**, despite
+shoulder's identification being the same known-bad data C1 was excluded
+over. Worth a decision, not yet made.
+
+**Joint-space PD path benchmark (user's explicit ask: compare, don't
+assume rejected), same push, `w=1.0`:** delivers substantially MORE torque
+to the peer at the same weight -- C1's peer hits elbow at 100% of ceiling
+and shoulder at 91%; C4's peer hits shoulder 89% and elbow 78% -- versus
+the Cartesian-relay path's ~0.28N/0.44N Cartesian outputs, well under
+saturation. The joint-space path has more raw authority at the same
+weight, at the cost of running closer to the safety ceiling and (per the
+2026-09-03 real-hardware felt-quality assessment already on record above)
+worse position-tracking feel. A genuine trade-off, not a settled question.
+
+**Caveat, important:** none of this sweep's runs tripped the
+oscillation-abort latch (single ramp-hold-release cycle, not repeated
+escalating pushes) -- but the real 2026-09-03 session's `w1=0.5` DID trip
+under a different (repeated-push) pattern, never independently
+re-confirmed as a false positive. **This sim sweep showing no trip at
+`w1` up to 1.0 is NOT evidence that those weights are safe against the
+oscillation guard** -- it only characterizes deadband/headroom, a
+different failure mode. `test_c1_oscillation_trip_repeated_push_baseline.py`
+already exists for that check; it should be re-run at whatever weight is
+chosen from this data before trying it live.
+
+**Recommendation:** the two production weights currently on record
+(`w1=0.5`, `w4=0.3` from `4ch_safe`) are not verified-safe defaults so
+much as untested-for-this-purpose ones -- they sit right at this
+scenario's cliff. The 2026-09-03 session's own verification value
+(`w1=w4=0.4`) is closer to but still below where this sweep finds
+consistent signal (0.6+). Before the next real-hardware session: (1) run
+`test_c1_oscillation_trip_repeated_push_baseline.py`-style repeated pushes
+at `w1=w4=0.6-0.7` in sim to check the safety-latch margin at a weight that
+this sweep shows actually produces signal; (2) decide C4's shoulder-mask
+question; (3) fix or at least prominently document the `applied_force`
+gap before trusting any future Phase 2 capture that has C1/C4 active.
+
+Full raw sweep data: `/tmp/c1c4_baseline_results.json`; per-run 1kHz
+ground truth: `/tmp/c1c4_baseline_truth/*.csv`; summary plot:
+`/tmp/c1c4_weight_cliff.png`. Harness:
+`ros2_ws/src/touch_haptics/sim/tests/diag_c1c4_cartesian_baseline.py`.
+
+---
+
+## 2026-09-04, continued -- applied_force fixed with a regression test; the
+## two-stage deadband mathematically characterized and 5 architectures
+## compared. No hardware-facing parameter changed.
+
+**1. `applied_force` fixed** (`touch_slave.cpp` ~line 1301). Was `force_ros`
+(pre-relay); now `joint_path_commanded ? force_ros :
+mapDeviceVectorToRos(force_device)` -- `force_device` is the actual,
+post-relay, post-clamp value written to `HD_CURRENT_FORCE`, mirroring the
+exact pattern `last_force` already used. Joint-space branch intentionally
+left unchanged (out of scope, off by default). New
+`sim/tests/test_applied_force_reflects_relay.py`: confirmed to FAIL
+against the pre-fix code (applied_force stuck at 0.0 with the relay
+active) and PASS against the fix, plus a relay-inactive regression check
+and an applied_force/last_force cross-consistency check. Full sim suite:
+35 passed, 1 pre-existing skip, 0 failed.
+
+**2. Deadband math, precisely.** Two stages, different units/domain/form,
+confirmed by reading `computeForceEstimate()` and the Cartesian relay
+block directly:
+- **Stage 1** (`touch_force_estimate.hpp`, SOURCE node, PER-JOINT, BEFORE
+  weighting): `y[j] = sign(x[j]) * max(0, |x[j]| - threshold1[j])` --
+  SHRINKING/continuous (C0, a kink not a jump). `threshold1` = waist
+  0.07632 / shoulder 0.064 / elbow 0.05 N·m.
+- **Stage 2** (`touch_slave.cpp`'s relay block, PEER node, on the NORM of
+  the full 3-vector, AFTER weighting): `output = weighted if
+  ||weighted||>=0.02 else 0` -- HARD gate, a genuine step of up to 0.02
+  N·m at the boundary.
+- Combined minimum raw signal for joint j (unmasked, single-axis
+  dominant) to produce ANY output: `|x[j]| >= threshold1[j] +
+  0.02/(w*Cf)` -- exactly `bilateral_4ch.py`'s own existing
+  `effective_threshold_nm()`, now independently re-derived and confirmed.
+- **With the calibration-file bug below fixed**, this predicts and
+  matches the empirical cliff much more closely than the previous
+  (buggy-calibration) sweep did: real signal starts around `w1=0.5`,
+  consistent with the 2026-09-03 real-hardware session's own finding that
+  `w1=0.4` was the minimum verification-usable weight.
+
+**Bug found while doing this: the C1 sim captures were using the LEFT
+arm's identified `inertia_left.json`/`gravity_left_minimal.json` on the
+"slave" (right-arm role) node**, because `touch_slave.cpp`'s own
+`declare_parameter` defaults always point at the left-arm files and
+nothing in the capture script overrode them. `run_slave_right.sh` (the
+real launch script) DOES override `DOB_INERTIA_JSON`/`DOB_GRAVITY_JSON` to
+the `*_right.json` files -- production was never affected, only this new
+sim tooling was. Fixed in `diag_deadband_capture.py`; all C1 numbers below
+are from the corrected capture.
+
+**3. Five deadband architectures compared**, reconstructed OFFLINE from
+one captured raw (`tau_ext_nm`, pre-any-deadband) signal per source node
+across 3 push patterns (`escalating_fast`/`escalating_slow`/
+`multiaxis_fast`, the last matching the exact push sequence that tripped
+the real 2026-09-03 oscillation latch) -- not 5 separate C++ builds, so
+every variant is compared against the identical underlying signal, and no
+production code path was touched to get this data:
+
+| variant | transmission @ w=0.6 (C1/C4) | ever tripped latch | notes |
+|---|---|---|---|
+| (a) current 2-stage | 18.8% / 31.5% | No | the shipped system |
+| (b) current, higher w | same formula, swept | No (0.4-1.0 tested) | not a different architecture |
+| (c1) stage-1 only (drop the norm gate) | 18.8% / 31.5% (same, but ALSO works at w=0.4 where (a) is exactly 0) | No | **best candidate** |
+| (c2) stage-2 only (drop per-joint floor) | 60% / 60% (best transmission) | **Yes** -- tripped at nearly every weight under `multiaxis_fast` | reject, unsafe |
+| (d) single deadband after summation | 18.0% / 25.9% (worse than current) | No | more conservative, no benefit found |
+| (e) continuous/soft-knee | 11.3% / 27.3% (worse than current) | No | smoother (no step) but weaker in this regime |
+
+**(c1) strictly weakly dominates (a) at every weight tested** in this
+data: identical output once past stage 2's old cliff, but ALSO recovers
+signal at `w=0.4` (current gives exactly 0.0 there) with no observed
+safety regression across any of the 3 push patterns. **(c2) has to be
+rejected regardless of its transmission advantage** -- it's the only
+variant that ever tripped the oscillation latch, and it did so
+specifically under the pattern that matches the real historical trip,
+strong circumstantial evidence the per-joint stage-1 floor (which c2
+removes) is doing real anti-oscillation work, not just noise rejection.
+
+**4. C1/C4 shoulder-mask question, evaluated with corrected per-arm
+data:** unmasking C1's shoulder activates the relay earlier (works even
+at `w=0.4`, where masked C1 is exactly 0) and gives more signal at every
+weight -- but reaches 108-188% of shoulder's torque budget in the
+`multiaxis_fast` pattern at higher weights (the real Cartesian clamp
+would catch this before the device itself sees an over-torque, but it
+means the relay is regularly asking for more than shoulder's ceiling
+allows). This is exactly the mechanism the existing mask was built to
+avoid. C4 (master/left-arm source) shows much less difference between
+masked and unmasked in this data -- consistent with the "known-bad"
+identification finding being specifically about the RIGHT arm's shoulder,
+not a general Phantom Omni property -- but C4-unmasked still reaches
+112-159% of budget under aggressive multi-axis pushing at higher weight,
+so the same caution applies if C4's weight is ever raised much past where
+it sits today.
+
+**Caveat, same as before:** the oscillation-latch replay reuses the real
+`analyze_window()` function but reconstructs the surrounding window/
+decision scaffolding offline, against reconstructed rather than live
+signal -- it does not experience real message timing/DDS jitter. A clean
+result here is a reassuring screen, not proof of real-hardware safety.
+
+**Recommendation:** (c1) stage-1-only is the strongest evidence-based
+candidate found -- same safety profile as the shipped system in every
+test run, structurally recovers the specific dead zone this whole
+investigation was about, and doesn't require guessing at a new weight.
+Raising `w1`/`w4` alone (variant b) also works but is strictly dominated
+by (c1) at matched transmission levels (see the table). **No production
+change made** -- this is characterization only, per the task's explicit
+constraint.
+
+Full data: `/tmp/deadband_variant_results.json` (300 rows), raw captures
+in `/tmp/deadband_capture/*.json`, comparison plot
+`/tmp/deadband_variant_pareto.png`. New scripts:
+`sim/tests/diag_deadband_capture.py`, `sim/tests/diag_deadband_variants.py`,
+`sim/tests/test_applied_force_reflects_relay.py`.
+
+---
+
 ## Separate from the channel work: teleop quality
 
 These are ordinary tuning issues, not blockers, but they affect every test.

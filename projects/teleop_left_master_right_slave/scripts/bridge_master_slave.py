@@ -34,7 +34,11 @@ import rclpy
 from geometry_msgs.msg import PoseStamped, Vector3Stamped, WrenchStamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rcl_interfaces.msg import SetParametersResult
 from std_msgs.msg import Bool, Int32
+
+from startup_alignment import AlignmentConfig, TeleopStartupAlignment
+from touch_haptics.msg import BridgeDiagnostics
 
 AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
 
@@ -129,8 +133,29 @@ class MasterSlaveBridge(Node):
         self.absolute_trim = parse_triple(
             args.absolute_trim_xyz, args.absolute_trim_m, "absolute-trim-xyz")
 
-        self.left_anchor: Optional[list[float]] = None
-        self.right_anchor: Optional[list[float]] = None
+        # Startup/alignment state machine (2026-09-08, Phase 1 of the
+        # diagnose-and-repair task) -- OWNS anchor capture now. See
+        # startup_alignment.py's module docstring for why this does not
+        # change the anchor-relative control law itself, only how/when the
+        # anchors get captured and how quickly authority ramps in.
+        self.alignment = TeleopStartupAlignment(AlignmentConfig(
+            pose_stale_s=args.alignment_pose_stale_s,
+            hold_still_motion_m=args.alignment_hold_still_motion_m,
+            hold_still_duration_s=args.alignment_hold_still_duration_s,
+            max_alignment_error_m=args.alignment_max_error_m,
+            ramp_duration_s=args.alignment_ramp_s,
+        ))
+        self._calibration_written = False
+        # Populated by _update_c2() when C2 is on; stay at these safe
+        # defaults (zero delta, no limit hit) when it never runs.
+        self._c2_mapped_slave_relative = [0.0, 0.0, 0.0]
+        self._master_travel_limit_flag = False
+        self.bridge_diag_pub = self.create_publisher(
+            BridgeDiagnostics, "/bridge_diagnostics", 10)
+        self.declare_parameter("arm_teleop", False)
+        self.declare_parameter("reset_alignment", False)
+        self.add_on_set_parameters_callback(self._on_param)
+
         self.latest_left: Optional[list[float]] = None
         self.latest_right: Optional[list[float]] = None
         self.left_buttons = 0
@@ -163,6 +188,19 @@ class MasterSlaveBridge(Node):
 
         self.create_subscription(PoseStamped, args.left_pose_topic, self._left_cb, 10)
         self.create_subscription(PoseStamped, args.right_pose_topic, self._right_cb, 10)
+        # Diagnostics only (q_left_anchor/q_right_anchor) -- not consumed by
+        # the control law, which is purely Cartesian. Optional: empty topic
+        # string disables it entirely, matching this file's existing
+        # "empty/0 disables the feature" convention (slave_gravity_comp_n,
+        # left_gravity_comp_n).
+        if args.left_joint_angles_topic:
+            self.create_subscription(
+                Vector3Stamped, args.left_joint_angles_topic,
+                lambda m: self.alignment.update_master_q([m.vector.x, m.vector.y, m.vector.z]), 10)
+        if args.right_joint_angles_topic:
+            self.create_subscription(
+                Vector3Stamped, args.right_joint_angles_topic,
+                lambda m: self.alignment.update_slave_q([m.vector.x, m.vector.y, m.vector.z]), 10)
         self.create_subscription(Int32, args.left_buttons_topic, self._buttons_cb, 10)
         if args.report or args.reflect_enable:
             self.create_subscription(
@@ -256,12 +294,33 @@ class MasterSlaveBridge(Node):
 
     # ---- subscriptions -------------------------------------------------
 
+    def _on_param(self, params) -> SetParametersResult:
+        for p in params:
+            if p.name == "arm_teleop" and p.value:
+                self.alignment.arm()
+                self.get_logger().warn("arm_teleop: alignment armed, ramping if READY")
+            if p.name == "reset_alignment" and p.value:
+                self.alignment.reset()
+                self._calibration_written = False
+                self.get_logger().warn("reset_alignment: alignment state machine reset")
+        return SetParametersResult(successful=True)
+
+    def _map_axis(self, pos: list[float]) -> list[float]:
+        """The bridge's own axis_map + axis_scale composition, exposed for
+        startup_alignment.py's VALIDATE_ALIGNMENT step -- passed in rather
+        than duplicated there, so there is exactly one copy of this math."""
+        mapped = apply_axis_map(self.axis_map, pos)
+        return [mapped[i] * self.axis_scale[i] for i in range(3)]
+
     def _left_cb(self, msg: PoseStamped) -> None:
         self.latest_left = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
-        if self.left_anchor is None:
-            self.left_anchor = list(self.latest_left)
-            self.get_logger().info(f"left anchor {self.left_anchor}")
-            self._write_calibration()
+        # time.time(), not the ROS clock -- matches startup_alignment.py's
+        # own now_fn=time.time default (used for staleness/hold-window
+        # timing) and every other timestamp already used elsewhere in this
+        # file (self.start_time, self.last_wait_notice, ...). Mixing clock
+        # sources here would silently break staleness detection if this
+        # node ever ran under simulated time.
+        self.alignment.update_master_pose(self.latest_left, t=time.time())
 
     def _right_cb(self, msg: PoseStamped) -> None:
         pos = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
@@ -274,10 +333,7 @@ class MasterSlaveBridge(Node):
             self.slave_speed = (1.0 - sa) * self.slave_speed + sa * (step * 200.0)
         self.prev_right = list(pos)
         self.latest_right = pos
-        if self.right_anchor is None:
-            self.right_anchor = list(pos)
-            self.get_logger().info(f"right anchor {self.right_anchor}")
-            self._write_calibration()
+        self.alignment.update_slave_pose(pos, t=time.time())
 
     def _write_calibration(self) -> None:
         """Record the anchor pair to a shared file, so anything launched after
@@ -297,26 +353,38 @@ class MasterSlaveBridge(Node):
         reading.
         """
         path = os.path.expanduser(self.args.calibration_file)
+        left_anchor = self.alignment.left_anchor
+        right_anchor = self.alignment.right_anchor
         record: dict = {
             "timestamp": time.time(),
             "axis_map": self.args.axis_map,
             "axis_scale": self.axis_scale,
-            "left_anchor": self.left_anchor,
-            "right_anchor": self.right_anchor,
+            "left_anchor": left_anchor,
+            "right_anchor": right_anchor,
+            # 2026-09-08: anchors now come from startup_alignment.py's
+            # validated hold-still capture, not "whichever pose arrived
+            # first" -- see that module's docstring for what
+            # right_minus_mapped_left (below) does and does not mean
+            # geometrically.
+            "q_left_anchor": self.alignment.q_left_anchor,
+            "q_right_anchor": self.alignment.q_right_anchor,
+            "startup_state": self.alignment.state,
         }
-        if self.left_anchor is not None and self.right_anchor is not None:
-            # Diagnostic only, not used to move anything: what the right
+        if left_anchor is not None and right_anchor is not None:
+            # Diagnostic (and, since 2026-09-08, an actual FAULT gate --
+            # see startup_alignment.py's VALIDATE_ALIGNMENT): what the right
             # anchor "would be" if the two devices shared one origin and the
-            # current axis_map/scale were correct. A large gap here is a
-            # useful data point for the still-open axis-mapping investigation
-            # (see the axis-mapping-unresolved-bug memory note) even though it
-            # is not, by itself, proof the mapping is wrong.
-            mapped_left = apply_axis_map(self.axis_map, self.left_anchor)
-            mapped_left = [mapped_left[i] * self.axis_scale[i] for i in range(3)]
+            # current axis_map/scale were correct. Reuses the SAME value the
+            # state machine already computed (self.alignment.initial_
+            # alignment_error_xyz/_norm) rather than recomputing it here,
+            # so this file can never silently disagree with what actually
+            # gated arming.
+            mapped_left = self._map_axis(left_anchor)
             record["mapped_left_anchor"] = mapped_left
-            record["right_minus_mapped_left"] = [
-                self.right_anchor[i] - mapped_left[i] for i in range(3)
+            record["right_minus_mapped_left"] = self.alignment.initial_alignment_error_xyz or [
+                right_anchor[i] - mapped_left[i] for i in range(3)
             ]
+            record["initial_alignment_error_norm"] = self.alignment.initial_alignment_error_norm
         try:
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
             fd, tmp_path = tempfile.mkstemp(
@@ -337,10 +405,16 @@ class MasterSlaveBridge(Node):
         elif not engaged and self.clutch_active:
             self.clutch_active = False
             # Re-anchor both sides so the slave does not jump on re-engage.
+            # Direct mutation of the alignment module's anchors, bypassing
+            # its HOLD_STILL/VALIDATE_ALIGNMENT gate on purpose: clutch is a
+            # MID-SESSION re-anchor (the operator is already holding the
+            # clutch button, which is itself a form of "hold still" intent),
+            # not a fresh startup -- unchanged behavior from before this
+            # module existed, just pointed at the new anchor storage.
             if self.latest_left is not None:
-                self.left_anchor = list(self.latest_left)
+                self.alignment.left_anchor = list(self.latest_left)
             if self.last_target is not None:
-                self.right_anchor = list(self.last_target)
+                self.alignment.right_anchor = list(self.last_target)
             self.get_logger().info("clutch released: re-anchored")
 
     def _tracking_cb(self, msg: Vector3Stamped) -> None:
@@ -356,7 +430,26 @@ class MasterSlaveBridge(Node):
         self._publish_gravity_comp()
         self._publish_left_gravity_comp()
 
-        if self.left_anchor is None or self.right_anchor is None or self.latest_left is None:
+        self.alignment.tick(self._map_axis)
+        if not self._calibration_written and self.alignment.left_anchor is not None \
+                and self.alignment.right_anchor is not None:
+            self._calibration_written = True
+            self.get_logger().info(
+                f"anchors captured: left={self.alignment.left_anchor} "
+                f"right={self.alignment.right_anchor} state={self.alignment.state}"
+            )
+            self._write_calibration()
+        if self.alignment.state == "FAULT" and not getattr(self, "_fault_announced", False):
+            self._fault_announced = True
+            self.get_logger().error(
+                f"startup alignment FAULT: {self.alignment.diagnostics().get('fault_reason')} "
+                "-- clear with 'ros2 param set /touch_master_slave_bridge reset_alignment true'"
+            )
+        elif self.alignment.state != "FAULT":
+            self._fault_announced = False
+
+        if self.alignment.left_anchor is None or self.alignment.right_anchor is None \
+                or self.latest_left is None:
             self._report_waiting()
             return
 
@@ -389,7 +482,7 @@ class MasterSlaveBridge(Node):
                 self.master_vel[i] = (1.0 - sa) * self.master_vel[i] + sa * raw_v
         self.prev_left = list(self.latest_left)
 
-        delta = [self.latest_left[i] - self.left_anchor[i] for i in range(3)]
+        delta = [self.latest_left[i] - self.alignment.left_anchor[i] for i in range(3)]
         if abs(delta[0]) < self.args.deadband_m:
             delta[0] = 0.0
         if abs(delta[1]) < self.args.deadband_m:
@@ -397,8 +490,10 @@ class MasterSlaveBridge(Node):
         if abs(delta[2]) < self.args.deadband_m:
             delta[2] = 0.0
 
-        mapped = apply_axis_map(self.axis_map, delta)
-        mapped = [mapped[i] * self.axis_scale[i] for i in range(3)]
+        mapped_unclamped = apply_axis_map(self.axis_map, delta)
+        mapped_unclamped = [mapped_unclamped[i] * self.axis_scale[i] for i in range(3)]
+        mapped = list(mapped_unclamped)
+        slave_travel_limit_flag = False
 
         if str(self.args.max_offset_mode) == "norm":
             # Original behaviour. Shrinks the whole vector so its length fits,
@@ -408,6 +503,7 @@ class MasterSlaveBridge(Node):
             if norm > self.args.max_offset_m and norm > 1e-9:
                 shrink = self.args.max_offset_m / norm
                 mapped = [v * shrink for v in mapped]
+                slave_travel_limit_flag = True
         else:
             # Clamp each axis on its own. A norm clamp couples the axes: run out
             # of travel on one and the others get squashed too, which reads as
@@ -417,12 +513,14 @@ class MasterSlaveBridge(Node):
                 if limit > 0.0:
                     if mapped[i] > limit:
                         mapped[i] = limit
+                        slave_travel_limit_flag = True
                         self._note_limit(i)
                     elif mapped[i] < -limit:
                         mapped[i] = -limit
+                        slave_travel_limit_flag = True
                         self._note_limit(i)
 
-        target = [self.right_anchor[i] + mapped[i] for i in range(3)]
+        target = [self.alignment.right_anchor[i] + mapped[i] for i in range(3)]
 
         # Absolute axes ignore the anchor and command the master's own
         # coordinate, so the slave holds the same height as your hand rather
@@ -432,6 +530,19 @@ class MasterSlaveBridge(Node):
             abs_master = apply_axis_map(self.axis_map, self.latest_left)
             for i in self.absolute_axes:
                 target[i] = abs_master[i] * self.axis_scale[i] + self.absolute_trim[i]
+
+        # Startup ramp, applied at the safest mathematically consistent
+        # location (see startup_alignment.py's module docstring): blends
+        # the FINAL commanded setpoint from right_anchor (alpha=0, zero
+        # relative motion -- the slave holds exactly where its anchor was
+        # captured) to the full target above (alpha=1, the pre-existing
+        # formula byte-for-byte). Before RAMPING/ACTIVE (i.e. during
+        # WAIT_FOR_POSES..READY) ramp_alpha is exactly 0.0, so this
+        # continuously commands "stay at your anchor" -- actuator authority
+        # stays gated without needing a separate branch that skips
+        # publishing entirely (which would let the slave's force go stale
+        # and drop to zero instead of holding).
+        target = self.alignment.blend_target(target)
 
         target = self._rate_limit(target)
 
@@ -450,16 +561,54 @@ class MasterSlaveBridge(Node):
 
         for i in range(3):
             self.peak_cmd[i] = max(self.peak_cmd[i], abs(mapped[i]))
-            if self.latest_right is not None and self.right_anchor is not None:
+            if self.latest_right is not None and self.alignment.right_anchor is not None:
                 self.peak_act[i] = max(
-                    self.peak_act[i], abs(self.latest_right[i] - self.right_anchor[i]))
+                    self.peak_act[i], abs(self.latest_right[i] - self.alignment.right_anchor[i]))
 
         self.last_target = target
         self._publish_target(target)
         self._update_force_reflection(target)
         if self.args.enable_c2 and self.left_target_pub is not None:
             self._update_c2()
+        self._publish_bridge_diagnostics(delta, mapped_unclamped, target, slave_travel_limit_flag)
         self._maybe_report(target)
+
+    def _publish_bridge_diagnostics(self, master_relative: list[float],
+                                    mapped_master_relative: list[float],
+                                    c3_target: list[float],
+                                    slave_travel_limit_flag: bool) -> None:
+        """See msg/BridgeDiagnostics.msg's own header comment for what each
+        field means and why it exists -- added 2026-09-08 for the C2+C3
+        position-only diagnostic task. Read-only telemetry; does not feed
+        back into any control decision."""
+        slave_relative = [0.0, 0.0, 0.0]
+        c3_err = [0.0, 0.0, 0.0]
+        if self.latest_right is not None and self.alignment.right_anchor is not None:
+            slave_relative = [self.latest_right[i] - self.alignment.right_anchor[i] for i in range(3)]
+            c3_err = [c3_target[i] - self.latest_right[i] for i in range(3)]
+        c2_err = [0.0, 0.0, 0.0]
+        if self.args.enable_c2 and self.last_left_target is not None and self.latest_left is not None:
+            c2_err = [self.last_left_target[i] - self.latest_left[i] for i in range(3)]
+
+        msg = BridgeDiagnostics()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.master_relative_m = list(master_relative)
+        msg.slave_relative_m = slave_relative
+        msg.mapped_master_relative_m = list(mapped_master_relative)
+        msg.mapped_slave_relative_m = list(self._c2_mapped_slave_relative)
+        msg.c2_position_error_m = c2_err
+        msg.c3_position_error_m = c3_err
+        err_xyz = self.alignment.initial_alignment_error_xyz
+        msg.alignment_error_xyz_m = list(err_xyz) if err_xyz is not None else [0.0, 0.0, 0.0]
+        msg.alignment_error_norm_m = float(self.alignment.initial_alignment_error_norm or 0.0)
+        msg.follow_error_m = math.sqrt(sum(v * v for v in c3_err))
+        msg.bridge_state = self.alignment.state
+        msg.ramp_alpha = float(self.alignment.ramp_alpha)
+        msg.c2_enabled = bool(self.args.enable_c2)
+        msg.c3_enabled = True
+        msg.master_travel_limit_flag = bool(self._master_travel_limit_flag)
+        msg.slave_travel_limit_flag = bool(slave_travel_limit_flag)
+        self.bridge_diag_pub.publish(msg)
 
     def _update_c2(self) -> None:
         """C2: slave position -> master target, the reverse direction of C3.
@@ -473,22 +622,29 @@ class MasterSlaveBridge(Node):
         already does via tracking error; this is the position-channel
         counterpart the channel table calls C2).
         """
-        if self.latest_right is None:
+        if self.latest_right is None or self.alignment.right_anchor is None or self.alignment.left_anchor is None:
             return
-        slave_disp = [self.latest_right[i] - self.right_anchor[i] for i in range(3)]
+        slave_disp = [self.latest_right[i] - self.alignment.right_anchor[i] for i in range(3)]
         unscaled = [
             slave_disp[i] / self.axis_scale[i] if abs(self.axis_scale[i]) > 1e-9 else 0.0
             for i in range(3)
         ]
         master_disp = apply_axis_map_inverse(self.axis_map, unscaled)
+        # Stored PRE-clamp, for BridgeDiagnostics' mapped_slave_relative_m --
+        # the "what C2 is asking for" value, matching C3's own mapped_unclamped
+        # convention in _tick().
+        self._c2_mapped_slave_relative = list(master_disp)
+        self._master_travel_limit_flag = False
         limit = float(self.args.left_max_offset_m)
         if limit > 0.0:
             for i in range(3):
                 if master_disp[i] > limit:
                     master_disp[i] = limit
+                    self._master_travel_limit_flag = True
                 elif master_disp[i] < -limit:
                     master_disp[i] = -limit
-        left_target = [self.left_anchor[i] + master_disp[i] for i in range(3)]
+                    self._master_travel_limit_flag = True
+        left_target = [self.alignment.left_anchor[i] + master_disp[i] for i in range(3)]
         self.last_left_target = left_target
         self._publish_left_target(left_target)
 
@@ -664,11 +820,20 @@ class MasterSlaveBridge(Node):
         )
 
     def _missing_topics(self) -> list[str]:
+        # latest_left/latest_right are set on every message unconditionally
+        # (see _left_cb/_right_cb), unlike alignment.left_anchor/right_anchor
+        # which only become non-None once the full hold-still capture
+        # completes -- using the anchors here would misreport "waiting for
+        # topic" for the entire alignment sequence even once both topics are
+        # genuinely publishing.
         missing = []
         if self.latest_left is None:
             missing.append(self.args.left_pose_topic)
-        if self.right_anchor is None:
+        if self.latest_right is None:
             missing.append(self.args.right_pose_topic)
+        if self.latest_left is not None and self.latest_right is not None \
+                and self.alignment.left_anchor is None:
+            missing.append(f"alignment ({self.alignment.state})")
         return missing
 
     def _report_waiting(self) -> None:
@@ -746,6 +911,12 @@ class MasterSlaveBridge(Node):
         if now - self.last_report < self.args.report_interval_s:
             return
         self.last_report = now
+        d = self.alignment.diagnostics()
+        self.get_logger().info(
+            f"[align] state={d['startup_state']} ramp_alpha={d['ramp_alpha']:.2f} "
+            f"master_age={d['master_pose_age_s']:.3f}s slave_age={d['slave_pose_age_s']:.3f}s "
+            f"alignment_error_norm={d['initial_alignment_error_norm']}"
+        )
         line = f"[bridge] target=({target[0]:+.4f},{target[1]:+.4f},{target[2]:+.4f})"
         if self.latest_right is not None:
             lag = [target[i] - self.latest_right[i] for i in range(3)]
@@ -794,6 +965,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--left-pose-topic", default="/touch_left/pose")
     parser.add_argument("--left-buttons-topic", default="/touch_left/buttons")
     parser.add_argument("--right-pose-topic", default="/touch_right/pose")
+    align = parser.add_argument_group(
+        "startup alignment (2026-09-08 Phase 1)",
+        "See startup_alignment.py for the full state machine and the "
+        "worked-out geometric meaning of the alignment-error metric.")
+    align.add_argument("--alignment-pose-stale-s", type=float, default=0.2)
+    align.add_argument("--alignment-hold-still-motion-m", type=float, default=0.003,
+                       help="peak-to-peak envelope, per axis, both robots must "
+                            "stay within during the hold window")
+    align.add_argument("--alignment-hold-still-duration-s", type=float, default=0.75)
+    align.add_argument("--alignment-max-error-m", type=float, default=0.15,
+                       help="sanity bound on right_minus_mapped_left's norm -- "
+                            "NOT a 'must be zero' precision gate, see the module "
+                            "docstring for why")
+    align.add_argument("--alignment-ramp-s", type=float, default=1.0,
+                       help="duration of the RAMPING state's authority blend")
+    align.add_argument("--left-joint-angles-topic", default="",
+                       help="optional, for q_left_anchor diagnostics only -- "
+                            "not consumed by the control law. Empty disables it.")
+    align.add_argument("--right-joint-angles-topic", default="",
+                       help="optional, for q_right_anchor diagnostics only.")
     parser.add_argument("--right-target-topic", default="/touch_right/target_pose")
     parser.add_argument("--right-enable-topic", default="/touch_right/enable")
     parser.add_argument("--enable-c2", type=_bool_arg, default=False,
@@ -924,6 +1115,21 @@ def main() -> None:
         pass
     except SystemExit as exc:
         exit_code = exc.code if isinstance(exc.code, int) else 1
+    except Exception as exc:  # noqa: BLE001
+        # Real bug found 2026-09-08: SIGTERM (what
+        # experiment_launch/99_stop_setup.sh actually sends, vs. the
+        # KeyboardInterrupt/ExternalShutdownException this already handled)
+        # can invalidate rclpy's context WHILE spin()'s loop is mid-
+        # spin_once(), raising a bare rclpy._rclpy_pybind11.RCLError instead
+        # of the higher-level ExternalShutdownException this file expected.
+        # Confirmed live: a real-hardware C2 diagnostic session, stopped via
+        # 99_stop_setup.sh, produced exactly this traceback -- the session's
+        # own data up to that point was healthy (no FAULT, normal tracking),
+        # this was purely a noisy, otherwise-harmless shutdown-path gap, not
+        # a live control fault. Logged, not silently swallowed -- if this
+        # ever fires for a DIFFERENT underlying reason, it should still be
+        # visible, just not as an unhandled traceback.
+        print(f"[bridge] shutdown: {type(exc).__name__}: {exc}", file=sys.stderr)
     finally:
         try:
             # Zero the master force before dropping enable, so the stylus does

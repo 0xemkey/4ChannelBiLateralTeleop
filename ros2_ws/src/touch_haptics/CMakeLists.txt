@@ -159,6 +159,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DobDiagnostics.msg"
   "msg/ForceEstimate.msg"
   "msg/BilateralStatus.msg"
+  "msg/CartesianControllerTelemetry.msg"
+  "msg/BridgeDiagnostics.msg"
   DEPENDENCIES std_msgs
 )
 

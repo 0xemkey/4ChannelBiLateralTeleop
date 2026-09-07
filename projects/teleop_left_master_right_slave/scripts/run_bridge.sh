@@ -125,6 +125,20 @@ unset ROS_LOCALHOST_ONLY
 
 set +u
 source /opt/ros/humble/setup.bash
+# This project's own workspace overlay. Needed since 2026-09-08:
+# bridge_master_slave.py imports touch_haptics.msg.BridgeDiagnostics, its
+# first-ever dependency on this project's custom message package -- until
+# then this script never needed anything beyond the ROS base install. A
+# user shell's own ~/.bashrc may source ROS humble too, but there is no
+# guarantee it overlays *this* workspace (it may source an unrelated
+# project's install/setup.bash instead), so this cannot be left implicit.
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+TOUCH_HAPTICS_SETUP="${REPO_ROOT}/ros2_ws/install/setup.bash"
+if [[ ! -r "${TOUCH_HAPTICS_SETUP}" ]]; then
+  echo "[run_bridge][error] workspace not built: ${TOUCH_HAPTICS_SETUP}" >&2
+  exit 1
+fi
+source "${TOUCH_HAPTICS_SETUP}"
 set -u
 
 # Device discovery is handled inside the bridge node, not here. Polling with

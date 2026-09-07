@@ -108,15 +108,27 @@ def cartesian_force_from_joint_torque(q, tau):
 
 
 def load_csv(path: Path) -> dict:
+    """Real bug fixed 2026-09-08: this assumed every column was numeric,
+    which broke the moment log_phase2_scenario.py added bridge_state (a
+    string, e.g. "ACTIVE") -- float("ACTIVE") raised ValueError and killed
+    the auto-plot for every capture with that column, not just ones that
+    used it deliberately. Columns are now converted to float per-column
+    (once, from the first row) with a fallback to leaving the whole column
+    as strings if that fails -- so a non-numeric column degrades to "not
+    plotted as a line," not "crashes the entire capture's plot set"."""
     cols: dict = {}
     with open(path) as f:
         reader = csv.DictReader(f)
         fieldnames = reader.fieldnames or []
-        for name in fieldnames:
-            cols[name] = []
+        raw: dict = {name: [] for name in fieldnames}
         for row in reader:
             for name in fieldnames:
-                cols[name].append(float(row[name]))
+                raw[name].append(row[name])
+    for name, values in raw.items():
+        try:
+            cols[name] = [float(v) for v in values]
+        except ValueError:
+            cols[name] = values  # left as strings, e.g. bridge_state
     return cols
 
 
@@ -319,6 +331,106 @@ def plot_haptic_force(cols: dict, out_dir: Path, stem: str, title_prefix: str,
     return paths
 
 
+def plot_channel_tracking_error(cols: dict, out_dir: Path, stem: str, title_prefix: str,
+                                error_prefix: str, channel_label: str, channel_tag: str) -> list:
+    """Added 2026-09-08 for the C2+C3 position-only diagnostic. Plots the
+    REAL-TIME per-channel tracking error (target - actual, from
+    /bridge_diagnostics -- see msg/BridgeDiagnostics.msg) directly, instead
+    of requiring the reader to infer it by eyeballing a master-vs-slave
+    position overlay. One separate figure per axis."""
+    t = cols["t_sync"]
+    axis_colors = {"x": "tab:blue", "y": "tab:orange", "z": "tab:green"}
+    paths = []
+    for axis in ("x", "y", "z"):
+        key = f"{error_prefix}_{axis}"
+        if key not in cols:
+            return []
+        fig, ax = plt.subplots(figsize=(11, 4.5))
+        ax.plot(t, cols[key], color=axis_colors[axis], linestyle="-", linewidth=1.3)
+        ax.axhline(0.0, color="k", linewidth=0.5)
+        ax.set_xlabel("time, s")
+        ax.set_ylabel("tracking error, m")
+        ax.set_title(f"{title_prefix} -- {channel_label} tracking error, {axis} axis")
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        out_path = out_dir / f"{stem}_{channel_tag}_tracking_error_{axis}.png"
+        fig.savefig(out_path, dpi=130)
+        plt.close(fig)
+        paths.append(out_path)
+    return paths
+
+
+def plot_alignment_error_norm(cols: dict, out_dir: Path, stem: str, title_prefix: str) -> list:
+    """Single figure: alignment_error_norm over time (constant once past
+    VALIDATE_ALIGNMENT -- a flat line is the CORRECT/expected shape, not a
+    plotting bug; see startup_alignment.py's module docstring for what this
+    value does and does not mean) plus bridge_state as a background label,
+    so a FAULT (if any occurred) is visible on the same figure."""
+    if "alignment_error_norm" not in cols:
+        return []
+    t = cols["t_sync"]
+    fig, ax = plt.subplots(figsize=(11, 4.5))
+    ax.plot(t, cols["alignment_error_norm"], color="tab:purple", linewidth=1.5)
+    ax.axhline(0.0, color="k", linewidth=0.5)
+    ax.set_xlabel("time, s")
+    ax.set_ylabel("alignment_error_norm, m")
+    ax.set_title(f"{title_prefix} -- startup alignment error norm (constant = expected)")
+    ax.grid(True, alpha=0.3)
+    if "bridge_state" in cols and isinstance(cols["bridge_state"][0], str):
+        states = cols["bridge_state"]
+        fault_spans = [(t[i], t[i]) for i in range(len(t)) if states[i] == "FAULT"]
+        for t0, t1 in fault_spans:
+            ax.axvspan(t0 - 0.05, t1 + 0.05, color="red", alpha=0.3)
+        if fault_spans:
+            ax.text(0.02, 0.95, "red = FAULT state", transform=ax.transAxes,
+                    color="red", fontsize=9, va="top")
+    fig.tight_layout()
+    out_path = out_dir / f"{stem}_alignment_error_norm.png"
+    fig.savefig(out_path, dpi=130)
+    plt.close(fig)
+    return [out_path]
+
+
+def plot_bilateral_relative_error(cols: dict, out_dir: Path, stem: str, title_prefix: str) -> list:
+    """mapped_master_relative vs mapped_slave_relative -- both expressed in
+    the SLAVE's frame (mapped_master_relative already went through the
+    master->slave axis map; mapped_slave_relative went through the INVERSE
+    map back into... master's frame, per _update_c2()'s own math -- so
+    these two are NOT directly comparable axis-for-axis unless axis_map is
+    the identity. Documented explicitly here rather than silently plotting
+    a misleading overlay: this figure is only a clean apples-to-apples
+    comparison when axis_map=x,y,z (the current default in this project's
+    launch scripts). If axis_map is not identity, treat this plot as
+    illustrative only."""
+    required = ["mapped_master_relative_x", "mapped_slave_relative_x"]
+    if not all(k in cols for k in required):
+        return []
+    t = cols["t_sync"]
+    axis_colors = {"x": "tab:blue", "y": "tab:orange", "z": "tab:green"}
+    paths = []
+    for axis in ("x", "y", "z"):
+        fig, ax = plt.subplots(figsize=(11, 4.5))
+        ax.plot(t, cols[f"mapped_master_relative_{axis}"], color=axis_colors[axis],
+                linestyle="-", linewidth=1.3, label="mapped_master_relative (C3 input)")
+        ax.plot(t, cols[f"mapped_slave_relative_{axis}"], color=axis_colors[axis],
+                linestyle="--", linewidth=1.3, label="mapped_slave_relative (C2 input)")
+        ax.axhline(0.0, color="k", linewidth=0.5)
+        ax.set_xlabel("time, s")
+        ax.set_ylabel("relative position, m")
+        ax.set_title(f"{title_prefix} -- bilateral relative motion, {axis} axis "
+                     f"(apples-to-apples only if axis_map is identity)")
+        ax.legend(loc="upper right", fontsize=9)
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        out_path = out_dir / f"{stem}_bilateral_relative_error_{axis}.png"
+        fig.savefig(out_path, dpi=130)
+        plt.close(fig)
+        paths.append(out_path)
+    return paths
+
+
 def process_one(csv_path: Path, out_dir: Path) -> None:
     cols = load_csv(csv_path)
     if not cols.get("t_sync"):
@@ -368,7 +480,22 @@ def process_one(csv_path: Path, out_dir: Path) -> None:
         print(f"[plot_phase2] {csv_path.name}: no joint_angles/applied_force columns "
               f"(older capture, predates this feature) -- skipping haptic-force plots")
 
-    all_paths = pos_paths + combined_paths + c4_paths + c1_paths + haptic_paths
+    # Added 2026-09-08 for the C2+C3 position-only diagnostic -- see
+    # msg/BridgeDiagnostics.msg. All degrade to an empty list (not an
+    # error) on older captures that predate these columns.
+    c2_err_paths = plot_channel_tracking_error(
+        cols, out_dir, stem, title_prefix, "c2_position_error", "C2 (slave->master)", "c2")
+    c3_err_paths = plot_channel_tracking_error(
+        cols, out_dir, stem, title_prefix, "c3_position_error", "C3 (master->slave)", "c3")
+    alignment_paths = plot_alignment_error_norm(cols, out_dir, stem, title_prefix)
+    bilateral_paths = plot_bilateral_relative_error(cols, out_dir, stem, title_prefix)
+    if not (c2_err_paths or c3_err_paths or alignment_paths):
+        print(f"[plot_phase2] {csv_path.name}: no bridge_diagnostics columns "
+              f"(older capture, or captured without the bridge running) -- "
+              f"skipping C2/C3 tracking-error and alignment plots")
+
+    all_paths = (pos_paths + combined_paths + c4_paths + c1_paths + haptic_paths
+                + c2_err_paths + c3_err_paths + alignment_paths + bilateral_paths)
     names = ", ".join(p.name for p in all_paths)
     print(f"[plot_phase2] {csv_path.name}: {n} samples -> {names}")
 

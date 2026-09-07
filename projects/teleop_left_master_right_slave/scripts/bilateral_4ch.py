@@ -67,6 +67,7 @@ from geometry_msgs.msg import Vector3Stamped
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rcl_interfaces.msg import SetParametersResult
+from std_msgs.msg import Bool
 
 from touch_haptics.msg import BilateralStatus, ForceEstimate
 
@@ -279,6 +280,33 @@ class BilateralController(Node):
         self.status_pub = self.create_publisher(
             BilateralStatus, args.status_topic, 20)
 
+        # C1/C4 REAL BUG, fixed 2026-09-07: the Cartesian relay block in
+        # touch_slave.cpp (both master and slave) is gated on
+        # `command.enabled`, the SAME flag /enable controls -- with nothing
+        # else running, this stays false forever (enabled_on_start_ defaults
+        # false, and neither run_master_left.sh nor run_slave_right.sh ever
+        # sets it). bridge_master_slave.py already publishes the SLAVE's own
+        # /enable unconditionally whenever C3 is armed, so C4 (into the
+        # slave) was never affected -- but the MASTER's /enable is published
+        # ONLY when the bridge runs with --enable-c2 or --reflect-enable,
+        # neither of which this script requires. Without one of those, C1
+        # silently did nothing on real hardware regardless of weight --
+        # confirmed live: same class of defect as the applied_force
+        # telemetry bug found the same week (a real precondition, not
+        # obviously visible from this script's own code). This script is
+        # exactly the node responsible for getting C1/C4 onto these
+        # devices, so it now ensures its own precondition rather than
+        # requiring a separate manual publisher per side. `command.enabled`
+        # has no staleness/timeout (touch_slave.cpp's enableCallback just
+        # latches the last value), so a low-rate publish is enough, but this
+        # publishes every tick to match bridge_master_slave.py's own
+        # existing convention and to self-heal if the receiving node
+        # restarts mid-session.
+        self.left_enable_pub = self.create_publisher(
+            Bool, args.left_enable_topic, 10)
+        self.right_enable_pub = self.create_publisher(
+            Bool, args.right_enable_topic, 10)
+
         # Manual re-arm: `ros2 param set /bilateral_4ch manual_rearm true`.
         # Consumed and reset to false the instant it clears a trip, so it
         # cannot be left permanently true and silently defeat the abort.
@@ -390,6 +418,22 @@ class BilateralController(Node):
         w4_eff = 0.0 if self.tripped else self.weights[3]
         w2_eff = self.weights[1]
         w3_eff = self.weights[2]
+
+        # See the constructor comment above self.left_enable_pub: C1 cannot
+        # reach the master, and C4 cannot reach the slave, unless that
+        # node's own command.enabled is true. Tied to the TARGET weight
+        # (self.weights, pre-trip/pre-tank), not w1_eff/w4_eff -- enable
+        # should stay true through a ramp-down or a trip (which should zero
+        # the relayed FORCE, not silently disable the device for whatever
+        # else might legitimately want it enabled), matching how
+        # bridge_master_slave.py never toggles the slave's enable off just
+        # because tracking is momentarily degraded.
+        enable_msg = Bool()
+        enable_msg.data = self.target_weights[0] > 0.0
+        self.left_enable_pub.publish(enable_msg)
+        enable_msg2 = Bool()
+        enable_msg2.data = self.target_weights[3] > 0.0
+        self.right_enable_pub.publish(enable_msg2)
 
         # ---- C1: slave contact torque -> master ----
         tau_e_hat = list(self.right_fe.tau_ext_deadbanded_nm) if right_fe_valid else [0.0, 0.0, 0.0]
@@ -613,6 +657,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--right-joint-target-topic", default="/touch_right/joint_target")
     p.add_argument("--left-joint-torque-ext-topic", default="/touch_left/joint_torque_ext_cmd")
     p.add_argument("--right-joint-torque-ext-topic", default="/touch_right/joint_torque_ext_cmd")
+    p.add_argument("--left-enable-topic", default="/touch_left/enable",
+                   help="Published true whenever w1>0 (C1 needs the master's own "
+                        "command.enabled to write the relayed Cartesian force). "
+                        "Same topic bridge_master_slave.py's --enable-c2/--reflect-enable "
+                        "would otherwise publish -- this script no longer depends on either.")
+    p.add_argument("--right-enable-topic", default="/touch_right/enable",
+                   help="Published true whenever w4>0. Usually redundant with the "
+                        "position bridge's own unconditional slave enable, kept for when "
+                        "this script runs without that bridge (e.g. sim tests).")
     p.add_argument("--status-topic", default="/bilateral_status")
 
     p.add_argument("--rate-hz", type=float, default=200.0,

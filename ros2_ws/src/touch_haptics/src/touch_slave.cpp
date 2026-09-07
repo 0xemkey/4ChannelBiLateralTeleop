@@ -14,6 +14,7 @@
 
 #include "touch_haptics/msg/dob_diagnostics.hpp"
 #include "touch_haptics/msg/force_estimate.hpp"
+#include "touch_haptics/msg/cartesian_controller_telemetry.hpp"
 
 #include <algorithm>
 #include <array>
@@ -128,6 +129,23 @@ struct DeviceState
   touch_haptics::Vec3 joint_pd_error_term_nm{0.0, 0.0, 0.0};
   touch_haptics::Vec3 joint_pd_cmd_nm{0.0, 0.0, 0.0};
   bool joint_pd_write_ok{false};
+
+  // Exact servo-frame Cartesian decomposition. Telemetry only: these fields
+  // snapshot values already used by the command path and never feed it.
+  std::array<double, 3> target_position_m{0.0, 0.0, 0.0};
+  std::array<double, 3> position_error_clamped_m{0.0, 0.0, 0.0};
+  std::array<double, 3> spring_force_n{0.0, 0.0, 0.0};
+  std::array<double, 3> damping_force_n{0.0, 0.0, 0.0};
+  std::array<double, 3> auxiliary_force_n{0.0, 0.0, 0.0};
+  std::array<double, 3> force_before_primary_clamp_n{0.0, 0.0, 0.0};
+  std::array<double, 3> force_after_primary_clamp_n{0.0, 0.0, 0.0};
+  std::array<double, 3> relay_torque_received_nm{0.0, 0.0, 0.0};
+  std::array<double, 3> relay_force_n{0.0, 0.0, 0.0};
+  std::array<double, 3> force_before_final_clamp_n{0.0, 0.0, 0.0};
+  bool enabled{false}, deadman_ok{false}, target_valid{false}, target_fresh{false};
+  bool force_valid{false}, force_fresh{false}, relay_valid{false}, relay_fresh{false};
+  bool relay_applied{false}, position_error_clamped{false};
+  bool primary_force_clamped{false}, final_force_clamped{false}, near_singular{false};
 };
 
 struct CommandState
@@ -314,8 +332,27 @@ public:
     // near the target. New Kp saturates at ~15-17 degrees instead (sized as
     // max_torque_nm / 0.3 rad per joint), which is the actual, dominant fix;
     // Kd is left as-is because at the new, much smaller Kp it already sits
-    // comfortably above critical damping (2*sqrt(Kp*M_n) -- ~2x overdamped on
-    // all three joints), which is the safe direction to be wrong in.
+    // above critical damping (Kd_crit = 2*sqrt(Kp*M_n)), which is the safe
+    // direction to be wrong in. CORRECTED 2026-09-04: this was previously
+    // claimed as "~2x overdamped" here; verified against the real identified
+    // M_n (inertia_left.json) it is actually 6-8x:
+    //
+    //     joint      M_n (kg*m^2)   Kd_crit    Kd     Kd/Kd_crit
+    //     waist      0.003369       0.0636     0.50   7.86x
+    //     shoulder   0.002945       0.0485     0.30   6.18x
+    //     elbow      0.000233       0.0159     0.10   6.31x
+    //
+    // Still safely overdamped (direction unchanged), just far more sluggish
+    // than "~2x" implied. NOT the cause of the historical C4 test failure --
+    // that was a test-methodology bug (see the RESOLVED [C4] note below,
+    // joint_target going stale during the test's own spin_for() windows),
+    // confirmed 2026-09-04 by re-running test_joint_space_write_gated.py
+    // clean at 85.2% closed_fraction with these same Kd values unchanged.
+    // This ratio describes the decoupled nominal joint-space model only
+    // (M_n*qddot = Kp*err - Kd*qdot, gravity/friction/Coulomb/DOB terms enter
+    // as additive feedforward/disturbance, not as cross-terms here) and does
+    // not by itself say anything about the production Cartesian-relay C1/C4
+    // path, which does not use kp_nm_per_rad_/kd_nms_per_rad_ at all.
     kp_nm_per_rad_ = declare_parameter<std::vector<double>>(
       "kp_nm_per_rad", std::vector<double>{0.30, 0.20, 0.27});
     kd_nms_per_rad_ = declare_parameter<std::vector<double>>(
@@ -371,6 +408,9 @@ public:
       create_publisher<touch_haptics::msg::DobDiagnostics>("dob_diagnostics", 10);
     force_ext_hat_pub_ =
       create_publisher<touch_haptics::msg::ForceEstimate>("force_ext_hat", 10);
+    cartesian_telemetry_pub_ =
+      create_publisher<touch_haptics::msg::CartesianControllerTelemetry>(
+        "cartesian_controller_telemetry", 10);
     initDevice();
 
     // AFTER initDevice(): configureDob() asks the driver for HD_UPDATE_RATE to
@@ -772,7 +812,13 @@ private:
       !self->require_deadman_ || ((buttons & self->deadman_button_mask_) != 0);
 
     std::array<double, 3> tracking_error{0.0, 0.0, 0.0};
+    std::array<double, 3> clamped_error{0.0, 0.0, 0.0};
+    std::array<double, 3> spring_force{0.0, 0.0, 0.0};
+    std::array<double, 3> damping_force{0.0, 0.0, 0.0};
+    std::array<double, 3> auxiliary_force{0.0, 0.0, 0.0};
     bool tracking_valid = false;
+    bool position_error_clamped = false;
+    bool primary_force_clamped = false;
 
     std::array<double, 3> force_ros{0.0, 0.0, 0.0};
     if (command.enabled && deadman_ok) {
@@ -785,19 +831,28 @@ private:
         tracking_error = err;
         tracking_valid = true;
         for (double &v : err) {
+          position_error_clamped |= std::abs(v) > self->max_position_error_m_;
           v = clampScalar(v, -self->max_position_error_m_, self->max_position_error_m_);
         }
-        force_ros[0] += self->stiffness_n_per_m_ * err[0] - self->damping_n_s_per_m_ * vel_mps[0];
-        force_ros[1] += self->stiffness_n_per_m_ * err[1] - self->damping_n_s_per_m_ * vel_mps[1];
-        force_ros[2] += self->stiffness_n_per_m_ * err[2] - self->damping_n_s_per_m_ * vel_mps[2];
+        clamped_error = err;
+        for (int i = 0; i < 3; ++i) {
+          spring_force[i] = self->stiffness_n_per_m_ * err[i];
+          damping_force[i] = -self->damping_n_s_per_m_ * vel_mps[i];
+          force_ros[i] += spring_force[i] + damping_force[i];
+        }
       }
       if (force_fresh) {
-        force_ros[0] += command.force_cmd_n[0];
-        force_ros[1] += command.force_cmd_n[1];
-        force_ros[2] += command.force_cmd_n[2];
+        auxiliary_force = command.force_cmd_n;
+        for (int i = 0; i < 3; ++i) force_ros[i] += auxiliary_force[i];
       }
+      primary_force_clamped = std::sqrt(force_ros[0]*force_ros[0] + force_ros[1]*force_ros[1] + force_ros[2]*force_ros[2]) > self->max_force_n_;
       clampNorm(force_ros, self->max_force_n_);
     }
+    const std::array<double, 3> force_before_primary_clamp{
+      spring_force[0] + damping_force[0] + auxiliary_force[0],
+      spring_force[1] + damping_force[1] + auxiliary_force[1],
+      spring_force[2] + damping_force[2] + auxiliary_force[2]};
+    const auto force_after_primary_clamp = force_ros;
 
     // Not const: the C1-onto-Cartesian relay below (added 2026-09-03) adds to
     // this after q_rad/sing become available, further down the function.
@@ -1186,18 +1241,26 @@ private:
     // already requires (computed above, in scope here) -- a relayed C1/C4
     // signal must not be able to apply force to a device the operator has
     // not enabled, the same safety property the spring/damper already has.
+    std::array<double, 3> relay_torque{0.0, 0.0, 0.0};
+    std::array<double, 3> relay_force_ros{0.0, 0.0, 0.0};
+    std::array<double, 3> force_before_final_clamp_device = force_device;
+    bool relay_fresh = false;
+    bool relay_applied = false;
+    bool final_force_clamped = false;
     if (!self->joint_space_control_ && !sing.near_singular &&
         command.enabled && deadman_ok) {
       const bool joint_ext_fresh_cartesian =
         command.joint_torque_ext_valid &&
         std::chrono::duration<double>(now - command.last_joint_torque_ext_time).count() <=
           self->stale_timeout_s_;
+      relay_fresh = joint_ext_fresh_cartesian;
       if (joint_ext_fresh_cartesian) {
         const touch_haptics::Vec3 tau_ext{
           command.joint_torque_ext_deadbanded_nm[0],
           command.joint_torque_ext_deadbanded_nm[1],
           command.joint_torque_ext_deadbanded_nm[2],
         };
+        relay_torque = tau_ext;
         // Floor sized from live observation: genuine resting-state
         // residual on the two joints C1 actually relays (waist, elbow --
         // shoulder is separately excluded upstream in bilateral_4ch.py)
@@ -1213,6 +1276,8 @@ private:
           const touch_haptics::Mat3 J = touch_haptics::jacobian(q_rad);
           const touch_haptics::Vec3 f_ext =
             touch_haptics::cartesianForceFromJointTorque(J, tau_ext, sing.det);
+          relay_force_ros = self->mapDeviceVectorToRos(f_ext);
+          relay_applied = true;
           if (std::getenv("TOUCH_DIAG_CARTESIAN_RELAY") != nullptr) {
             std::fprintf(stderr,
                          "[diag_relay_math] tau_ext=(%.5f,%.5f,%.5f) "
@@ -1225,11 +1290,13 @@ private:
           force_device[0] += f_ext[0];
           force_device[1] += f_ext[1];
           force_device[2] += f_ext[2];
+          force_before_final_clamp_device = force_device;
           // Re-clamp in device units: the Cartesian spring/damper's own
           // clampNorm already ran on force_ros before mapRosForceToDevice,
           // but this addition happens after that -- re-apply the same
           // ceiling so max_force_n_'s safety guarantee holds regardless of
           // how large the relayed signal is.
+          final_force_clamped = std::sqrt(force_device[0]*force_device[0] + force_device[1]*force_device[1] + force_device[2]*force_device[2]) > self->max_force_n_;
           clampNorm(force_device, self->max_force_n_);
         }
       }
@@ -1279,7 +1346,59 @@ private:
       self->state_.vel_mps = vel_mps;
       self->state_.quat_xyzw = {qx, qy, qz, qw};
       self->state_.rpy_rad = {roll, pitch, yaw};
-      self->state_.applied_force_n = force_ros;
+      // BUG FIXED 2026-09-04: this used to read `force_ros` unconditionally,
+      // captured at line ~823 BEFORE the C1/C4-onto-Cartesian relay block
+      // (~lines 1189-1254) has run -- so whenever that relay was active,
+      // `applied_force` (documented project-wide, e.g. log_phase2_scenario.py's
+      // own docstring, as "the REAL rendered Cartesian force... the haptic
+      // force the operator actually feels") silently omitted the relay's
+      // contribution, even though the actual `hdSetDoublev(HD_CURRENT_FORCE,
+      // ...)` write (using `force_device`, mutated by that same relay block)
+      // was correct. Found via sim/tests/diag_c1c4_cartesian_baseline.py: the
+      // device's own `last_force` readback showed the relay's effect, the
+      // `applied_force` topic never moved regardless of relay weight.
+      //
+      // Fix mirrors the exact pattern `last_force` already uses two blocks
+      // below (mapDeviceVectorToRos of a device-frame vector) -- NOT a new
+      // convention. Only the Cartesian branch is affected: `force_device` is
+      // only what was actually written when `!joint_path_commanded`; when the
+      // joint-space PD path fires instead, the real command was a joint
+      // torque, not a Cartesian force, and `force_ros` (the Cartesian
+      // spring/damper's own would-be output, never written to the device in
+      // that branch) is left as the reported value, UNCHANGED from before
+      // this fix -- that branch is off by default, not what this bug was
+      // about, and its own applied_force semantics are a separate, distinct
+      // question this fix does not attempt to resolve. No controller
+      // behavior changed: `force_device` itself is untouched, only what gets
+      // read out of it for this one telemetry topic.
+      self->state_.applied_force_n =
+        joint_path_commanded ? force_ros : self->mapDeviceVectorToRos(force_device);
+      self->state_.target_position_m = command.target_pos_m;
+      self->state_.position_error_clamped_m = clamped_error;
+      self->state_.spring_force_n = spring_force;
+      self->state_.damping_force_n = damping_force;
+      self->state_.auxiliary_force_n = auxiliary_force;
+      self->state_.force_before_primary_clamp_n = force_before_primary_clamp;
+      self->state_.force_after_primary_clamp_n = force_after_primary_clamp;
+      self->state_.relay_torque_received_nm = relay_torque;
+      self->state_.relay_force_n = relay_force_ros;
+      self->state_.force_before_final_clamp_n =
+        self->mapDeviceVectorToRos(force_before_final_clamp_device);
+      self->state_.enabled = command.enabled;
+      self->state_.deadman_ok = deadman_ok;
+      self->state_.target_valid = command.target_valid;
+      self->state_.target_fresh = target_fresh;
+      self->state_.force_valid = command.force_valid;
+      self->state_.force_fresh = force_fresh;
+      self->state_.relay_valid = command.joint_torque_ext_valid;
+      self->state_.relay_fresh = relay_fresh;
+      self->state_.relay_applied = relay_applied;
+      self->state_.position_error_clamped = position_error_clamped;
+      self->state_.primary_force_clamped = primary_force_clamped;
+      self->state_.final_force_clamped = final_force_clamped;
+      self->state_.near_singular = sing.near_singular;
+      self->state_.tracking_error_m = tracking_error;
+      self->state_.tracking_valid = tracking_valid;
       self->state_.buttons = buttons;
       self->state_.clutch = ((buttons & self->clutch_button_mask_) != 0);
       self->state_.stamp = self->now();
@@ -1317,8 +1436,6 @@ private:
         self->state_.joint_angles_rad = {joint_angles[0], joint_angles[1], joint_angles[2]};
         self->state_.motor_temperature = {
           motor_temperature[0], motor_temperature[1], motor_temperature[2]};
-        self->state_.tracking_error_m = tracking_error;
-        self->state_.tracking_valid = tracking_valid;
       }
     }
 
@@ -1400,6 +1517,36 @@ private:
     wrench.wrench.force.y = s.applied_force_n[1];
     wrench.wrench.force.z = s.applied_force_n[2];
     applied_force_pub_->publish(wrench);
+
+    touch_haptics::msg::CartesianControllerTelemetry ct;
+    ct.header = pose.header;
+    ct.position_m = s.pos_m; ct.velocity_mps = s.vel_mps;
+    ct.target_position_m = s.target_position_m;
+    ct.position_error_raw_m = s.tracking_error_m;
+    ct.position_error_clamped_m = s.position_error_clamped_m;
+    ct.spring_force_n = s.spring_force_n; ct.damping_force_n = s.damping_force_n;
+    ct.auxiliary_force_n = s.auxiliary_force_n;
+    ct.force_before_primary_clamp_n = s.force_before_primary_clamp_n;
+    ct.force_after_primary_clamp_n = s.force_after_primary_clamp_n;
+    ct.relay_torque_received_nm = s.relay_torque_received_nm;
+    ct.relay_force_n = s.relay_force_n;
+    ct.force_before_final_clamp_n = s.force_before_final_clamp_n;
+    ct.applied_force_n = s.applied_force_n;
+    ct.enabled = s.enabled; ct.deadman_ok = s.deadman_ok;
+    ct.target_valid = s.target_valid; ct.target_fresh = s.target_fresh;
+    ct.force_valid = s.force_valid; ct.force_fresh = s.force_fresh;
+    ct.relay_valid = s.relay_valid; ct.relay_fresh = s.relay_fresh;
+    ct.relay_applied = s.relay_applied; ct.tracking_valid = s.tracking_valid;
+    ct.position_error_clamped = s.position_error_clamped;
+    ct.primary_force_clamped = s.primary_force_clamped;
+    ct.final_force_clamped = s.final_force_clamped;
+    ct.joint_path_commanded = s.joint_path_commanded;
+    ct.cartesian_write_active = !s.joint_path_commanded;
+    ct.near_singular = s.near_singular;
+    ct.stiffness_n_per_m = stiffness_n_per_m_; ct.damping_n_s_per_m = damping_n_s_per_m_;
+    ct.max_position_error_m = max_position_error_m_; ct.max_force_n = max_force_n_;
+    ct.stale_timeout_s = stale_timeout_s_;
+    cartesian_telemetry_pub_->publish(ct);
 
     // Observer diagnostics. Published regardless of publish_telemetry_: the
     // observer is a separate concern from device telemetry, and this is the
@@ -1529,6 +1676,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Vector3Stamped>::SharedPtr joint_target_sub_;
   rclcpp::Subscription<touch_haptics::msg::ForceEstimate>::SharedPtr joint_torque_ext_sub_;
   rclcpp::Publisher<touch_haptics::msg::ForceEstimate>::SharedPtr force_ext_hat_pub_;
+  rclcpp::Publisher<touch_haptics::msg::CartesianControllerTelemetry>::SharedPtr cartesian_telemetry_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   HHD hHD_{HD_INVALID_HANDLE};

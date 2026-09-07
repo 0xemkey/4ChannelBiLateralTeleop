@@ -155,4 +155,5 @@ exec ros2 run touch_haptics touch_slave --ros-args \
   -r motor_temperature:=/touch_right/motor_temperature \
   -r tracking_error:=/touch_right/tracking_error \
   -r dob_diagnostics:=/touch_right/dob_diagnostics \
+  -r cartesian_controller_telemetry:=/touch_right/cartesian_controller_telemetry \
   -p dob_enable:="${DOB_ENABLE}"
