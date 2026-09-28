@@ -13,7 +13,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from startup_alignment import (  # noqa: E402
-    ACTIVE, CAPTURE_ANCHORS, FAULT, HOLD_STILL, READY, RAMPING,
+    ACTIVE, CAPTURE_ANCHORS, FAULT, HOLD_STILL, READY,
+    GRAVITY_RAMP_UP, GRAVITY_SETTLE, COUPLING_RAMP_UP,
+    COUPLING_RAMP_DOWN, GRAVITY_RAMP_DOWN,
     VALIDATE_ALIGNMENT, WAIT_FOR_POSES,
     AlignmentConfig, TeleopStartupAlignment,
 )
@@ -37,6 +39,12 @@ def _fast_config(**overrides) -> AlignmentConfig:
     cfg = AlignmentConfig(
         pose_stale_s=0.2, hold_still_motion_m=0.003, hold_still_duration_s=0.5,
         max_alignment_error_m=0.15, ramp_duration_s=1.0,
+        # Staged arm/disarm phases (2026-09-09) kept short so these
+        # deterministic-clock tests stay fast, matching this helper's own
+        # "_fast_config" purpose.
+        gravity_ramp_duration_s=0.1, gravity_settle_duration_s=0.05,
+        coupling_ramp_down_duration_s=1.0, self_follow_settle_duration_s=0.05,
+        gravity_ramp_down_duration_s=0.1,
     )
     for k, v in overrides.items():
         setattr(cfg, k, v)
@@ -51,6 +59,13 @@ def _settle_to_ready(align: TeleopStartupAlignment, clock: FakeClock,
     while align.state != READY and align.state != FAULT and total < 5.0:
         align.update_master_pose(list(master_pos), t=clock.t)
         align.update_slave_pose(list(slave_pos), t=clock.t)
+        # Positions held constant here -> zero velocity, so GRAVITY_SETTLE's
+        # 2026-09-09 velocity-gated quiet-hold (see startup_alignment.py) is
+        # satisfied immediately once this helper's caller later arms and
+        # ticks through the arm sequence, matching this fake-clock unit
+        # test's "instantaneous, no real plant dynamics" model.
+        align.update_master_velocity([0.0, 0.0, 0.0])
+        align.update_slave_velocity([0.0, 0.0, 0.0])
         align.tick(IDENTITY_MAP)
         clock.advance(step_s)
         total += step_s
@@ -173,33 +188,63 @@ def test_failed_validation_prevents_arm():
 # 7 & 8. Ramp starts at zero and reaches one monotonically.
 # ---------------------------------------------------------------------------
 def test_ramp_starts_at_zero_and_reaches_one_monotonically():
+    """2026-09-09 staged-transition rewrite: arm() now drives the sequence
+    GRAVITY_RAMP_UP -> GRAVITY_SETTLE -> COUPLING_RAMP_UP -> ACTIVE, with two
+    independent ramp scalars. Both gravity_ramp_alpha and coupling_ramp_alpha
+    (== the legacy ramp_alpha) must each start at 0, be monotonically
+    non-decreasing throughout, and reach exactly 1.0 by ACTIVE -- and
+    coupling_ramp_alpha must stay at exactly 0 for the whole gravity phase
+    (Part 1's "do not overload one ramp_alpha for unrelated physical
+    processes" -- verified here, not just asserted in a docstring)."""
     clock = FakeClock()
     align = TeleopStartupAlignment(_fast_config(ramp_duration_s=1.0), now_fn=clock)
     _settle_to_ready(align, clock)
     assert align.state == READY
+    assert align.gravity_ramp_alpha == 0.0
     assert align.ramp_alpha == 0.0
 
     align.arm()
-    align.tick(IDENTITY_MAP)  # consumes the arm request, enters RAMPING
-    assert align.state == RAMPING
-    assert align.ramp_alpha == 0.0, "ramp must start at exactly 0, not jump"
+    align.tick(IDENTITY_MAP)  # consumes the arm request, enters GRAVITY_RAMP_UP
+    assert align.state == GRAVITY_RAMP_UP
+    assert align.gravity_ramp_alpha == 0.0, "gravity ramp must start at exactly 0, not jump"
+    assert align.ramp_alpha == 0.0, "coupling must not move at all during the gravity phase"
 
-    prev_alpha = 0.0
-    samples = []
+    prev_gravity_alpha = 0.0
+    prev_coupling_alpha = 0.0
+    gravity_samples = []
+    coupling_samples = []
+    saw_coupling_zero_during_gravity_phase = False
     total = 0.0
-    while align.state == RAMPING and total < 2.0:
-        clock.advance(0.05)
+    while align.state != ACTIVE and total < 2.0:
+        clock.advance(0.02)
         align.update_master_pose([0.0, 0.0, 0.0], t=clock.t)
         align.update_slave_pose([0.0, 0.0, 0.0], t=clock.t)
+        align.update_master_velocity([0.0, 0.0, 0.0])
+        align.update_slave_velocity([0.0, 0.0, 0.0])
         align.tick(IDENTITY_MAP)
-        assert align.ramp_alpha >= prev_alpha - 1e-9, "ramp_alpha must be monotonically non-decreasing"
-        prev_alpha = align.ramp_alpha
-        samples.append(align.ramp_alpha)
-        total += 0.05
+        assert align.gravity_ramp_alpha >= prev_gravity_alpha - 1e-9, \
+            "gravity_ramp_alpha must be monotonically non-decreasing"
+        assert align.ramp_alpha >= prev_coupling_alpha - 1e-9, \
+            "coupling_ramp_alpha (legacy ramp_alpha) must be monotonically non-decreasing"
+        if align.state in (GRAVITY_RAMP_UP, GRAVITY_SETTLE):
+            assert align.ramp_alpha == 0.0, (
+                f"coupling must stay exactly 0 during {align.state} -- critical invariant "
+                "(bilateral position error must not generate spring demand during the "
+                "gravity-only phase)")
+            saw_coupling_zero_during_gravity_phase = True
+        prev_gravity_alpha = align.gravity_ramp_alpha
+        prev_coupling_alpha = align.ramp_alpha
+        gravity_samples.append(align.gravity_ramp_alpha)
+        coupling_samples.append(align.ramp_alpha)
+        total += 0.02
 
-    assert align.state == ACTIVE, f"ramp must complete into ACTIVE, ended in {align.state}"
+    assert align.state == ACTIVE, f"arm sequence must complete into ACTIVE, ended in {align.state}"
+    assert align.gravity_ramp_alpha == 1.0
     assert align.ramp_alpha == 1.0
-    assert len(samples) > 1, "ramp should take multiple ticks, not jump in one"
+    assert len(gravity_samples) > 1 and len(coupling_samples) > 1, "ramps should take multiple ticks, not jump in one"
+    assert saw_coupling_zero_during_gravity_phase, "test must actually observe the gravity-only phase"
+    assert any(0.0 < a < 1.0 for a in gravity_samples), "gravity ramp must pass through a genuine intermediate value"
+    assert any(0.0 < a < 1.0 for a in coupling_samples), "coupling ramp must pass through a genuine intermediate value"
 
 
 # ---------------------------------------------------------------------------
@@ -214,15 +259,21 @@ def test_no_target_discontinuity_at_ready_to_ramping():
     full_target = [0.5, 0.3, 0.1]  # a large hypothetical mapped target, far from the anchor
 
     # Blended target the instant BEFORE arming (alpha still 0 from READY).
+    # 2026-09-09 (unarmed-free-motion fix): while unarmed this now tracks the
+    # device's LIVE pose continuously, not a point frozen at anchor capture --
+    # so it need not be bit-identical to right_anchor (a mean of held-still
+    # samples), only numerically close, since the device hasn't moved since.
     target_before = align.blend_target(full_target)
-    assert target_before == align.right_anchor, (
-        "before arming, the blended target must equal right_anchor exactly "
-        "(zero commanded relative motion)"
-    )
+    for i in range(3):
+        assert abs(target_before[i] - align.right_anchor[i]) < 1e-6, (
+            "before arming, the blended target must track the live (unmoved) "
+            "pose, which should closely match right_anchor here"
+        )
 
     align.arm()
-    align.tick(IDENTITY_MAP)  # -> RAMPING, alpha still 0.0 on the very first tick
-    assert align.state == RAMPING
+    align.tick(IDENTITY_MAP)  # -> GRAVITY_RAMP_UP; coupling_ramp_alpha still 0.0 on the very first tick
+    assert align.state == GRAVITY_RAMP_UP
+    assert align.ramp_alpha == 0.0
     target_at_ramp_start = align.blend_target(full_target)
 
     for i in range(3):
@@ -249,6 +300,8 @@ def test_active_uses_existing_anchor_relative_mapping():
         clock.advance(0.05)
         align.update_master_pose([0.0, 0.0, 0.0], t=clock.t)
         align.update_slave_pose([0.03, 0.02, 0.01], t=clock.t)
+        align.update_master_velocity([0.0, 0.0, 0.0])
+        align.update_slave_velocity([0.0, 0.0, 0.0])
         align.tick(IDENTITY_MAP)
         total += 0.05
     assert align.state == ACTIVE

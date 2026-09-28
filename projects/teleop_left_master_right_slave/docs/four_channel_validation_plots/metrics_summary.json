@@ -1,0 +1,324 @@
+{
+  "X": {
+    "n": 4968,
+    "flags": {
+      "master_travel_limit_flag": 0.0,
+      "slave_travel_limit_flag": 0.0,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 0.0
+    },
+    "c_active": {
+      "c1_active_pct": 100.0,
+      "c4_active_pct": 100.0
+    },
+    "intended_axis_metrics": {
+      "rmse_mm": 7.5,
+      "mae_mm": 5.23,
+      "mean_signed_mm": -0.06,
+      "p95_mm": 14.78,
+      "lag_ms": 156.0,
+      "reach_ratio": 0.796
+    },
+    "cross_axis": {
+      "RMS(y)/RMS(x)": 0.019,
+      "RMS(z)/RMS(x)": 0.366
+    },
+    "master_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": -0.00047,
+        "force_ext_hat_std": 0.00276,
+        "force_ext_hat_absmax": 0.04672,
+        "relay_received_mean": 0.00026,
+        "relay_received_std": 0.00126,
+        "relay_received_absmax": 0.01093
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.01796,
+        "force_ext_hat_std": 0.00489,
+        "force_ext_hat_absmax": 0.03317,
+        "relay_received_mean": 0.0,
+        "relay_received_std": 0.0,
+        "relay_received_absmax": 0.0
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.00019,
+        "force_ext_hat_std": 0.00124,
+        "force_ext_hat_absmax": 0.0118,
+        "relay_received_mean": 0.0004,
+        "relay_received_std": 0.00109,
+        "relay_received_absmax": 0.00589
+      }
+    },
+    "slave_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": 0.00052,
+        "force_ext_hat_std": 0.00252,
+        "force_ext_hat_absmax": 0.02187,
+        "relay_received_mean": -0.00014,
+        "relay_received_std": 0.00083,
+        "relay_received_absmax": 0.01402
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.0,
+        "force_ext_hat_std": 0.0,
+        "force_ext_hat_absmax": 0.0,
+        "relay_received_mean": 0.00539,
+        "relay_received_std": 0.00147,
+        "relay_received_absmax": 0.00995
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.00079,
+        "force_ext_hat_std": 0.00217,
+        "force_ext_hat_absmax": 0.01177,
+        "relay_received_mean": 6e-05,
+        "relay_received_std": 0.00037,
+        "relay_received_absmax": 0.00354
+      }
+    }
+  },
+  "Y": {
+    "n": 5000,
+    "flags": {
+      "master_travel_limit_flag": 39.4,
+      "slave_travel_limit_flag": 0.0,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 0.2
+    },
+    "c_active": {
+      "c1_active_pct": 100.0,
+      "c4_active_pct": 100.0
+    },
+    "intended_axis_metrics": {
+      "rmse_mm": 11.79,
+      "mae_mm": 9.34,
+      "mean_signed_mm": 5.51,
+      "p95_mm": 20.37,
+      "lag_ms": 150.0,
+      "reach_ratio": 0.877
+    },
+    "cross_axis": {
+      "RMS(x)/RMS(y)": 0.126,
+      "RMS(z)/RMS(y)": 0.191
+    },
+    "master_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": 0.0,
+        "force_ext_hat_std": 0.0,
+        "force_ext_hat_absmax": 0.0,
+        "relay_received_mean": 0.00027,
+        "relay_received_std": 0.00102,
+        "relay_received_absmax": 0.00885
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.02065,
+        "force_ext_hat_std": 0.02052,
+        "force_ext_hat_absmax": 0.07725,
+        "relay_received_mean": 0.0,
+        "relay_received_std": 0.0,
+        "relay_received_absmax": 0.0
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.01246,
+        "force_ext_hat_std": 0.01639,
+        "force_ext_hat_absmax": 0.05601,
+        "relay_received_mean": -3e-05,
+        "relay_received_std": 0.00026,
+        "relay_received_absmax": 0.00309
+      }
+    },
+    "slave_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": 0.00054,
+        "force_ext_hat_std": 0.00203,
+        "force_ext_hat_absmax": 0.0177,
+        "relay_received_mean": 0.0,
+        "relay_received_std": 0.0,
+        "relay_received_absmax": 0.0
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.0,
+        "force_ext_hat_std": 0.0,
+        "force_ext_hat_absmax": 0.0,
+        "relay_received_mean": 0.00619,
+        "relay_received_std": 0.00616,
+        "relay_received_absmax": 0.02318
+      },
+      "elbow": {
+        "force_ext_hat_mean": -5e-05,
+        "force_ext_hat_std": 0.00051,
+        "force_ext_hat_absmax": 0.00619,
+        "relay_received_mean": 0.00374,
+        "relay_received_std": 0.00492,
+        "relay_received_absmax": 0.0168
+      }
+    }
+  },
+  "Z": {
+    "n": 5000,
+    "flags": {
+      "master_travel_limit_flag": 12.76,
+      "slave_travel_limit_flag": 0.0,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 0.0
+    },
+    "c_active": {
+      "c1_active_pct": 100.0,
+      "c4_active_pct": 100.0
+    },
+    "intended_axis_metrics": {
+      "rmse_mm": 6.12,
+      "mae_mm": 4.64,
+      "mean_signed_mm": 1.02,
+      "p95_mm": 13.69,
+      "lag_ms": 85.0,
+      "reach_ratio": 0.954
+    },
+    "cross_axis": {
+      "RMS(x)/RMS(z)": 0.011,
+      "RMS(y)/RMS(z)": 0.47
+    },
+    "master_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": 0.0,
+        "force_ext_hat_std": 0.0,
+        "force_ext_hat_absmax": 0.0,
+        "relay_received_mean": 0.00371,
+        "relay_received_std": 0.00507,
+        "relay_received_absmax": 0.01728
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.01707,
+        "force_ext_hat_std": 0.01807,
+        "force_ext_hat_absmax": 0.07398,
+        "relay_received_mean": 0.0,
+        "relay_received_std": 0.0,
+        "relay_received_absmax": 0.0
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.01332,
+        "force_ext_hat_std": 0.03002,
+        "force_ext_hat_absmax": 0.12107,
+        "relay_received_mean": 0.00263,
+        "relay_received_std": 0.00739,
+        "relay_received_absmax": 0.03511
+      }
+    },
+    "slave_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": 0.00742,
+        "force_ext_hat_std": 0.01015,
+        "force_ext_hat_absmax": 0.03455,
+        "relay_received_mean": 0.0,
+        "relay_received_std": 0.0,
+        "relay_received_absmax": 0.0
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.0,
+        "force_ext_hat_std": 0.0,
+        "force_ext_hat_absmax": 0.0,
+        "relay_received_mean": 0.00512,
+        "relay_received_std": 0.00542,
+        "relay_received_absmax": 0.02219
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.00526,
+        "force_ext_hat_std": 0.01478,
+        "force_ext_hat_absmax": 0.07021,
+        "relay_received_mean": 0.00399,
+        "relay_received_std": 0.00901,
+        "relay_received_absmax": 0.03632
+      }
+    }
+  },
+  "COMBINED": {
+    "n": 4000,
+    "flags": {
+      "master_travel_limit_flag": 36.05,
+      "slave_travel_limit_flag": 6.5,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 3.83
+    },
+    "c_active": {
+      "c1_active_pct": 100.0,
+      "c4_active_pct": 100.0
+    },
+    "per_axis_metrics": {
+      "x": {
+        "rmse_mm": 9.26,
+        "mae_mm": 7.45,
+        "mean_signed_mm": 1.7,
+        "p95_mm": 18.24,
+        "lag_ms": 50.0,
+        "reach_ratio": 1.007
+      },
+      "y": {
+        "rmse_mm": 11.65,
+        "mae_mm": 9.61,
+        "mean_signed_mm": 6.17,
+        "p95_mm": 21.43,
+        "lag_ms": 100.0,
+        "reach_ratio": 0.987
+      },
+      "z": {
+        "rmse_mm": 7.96,
+        "mae_mm": 6.12,
+        "mean_signed_mm": 1.81,
+        "p95_mm": 16.63,
+        "lag_ms": 75.0,
+        "reach_ratio": 0.971
+      }
+    },
+    "master_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": -0.00058,
+        "force_ext_hat_std": 0.0235,
+        "force_ext_hat_absmax": 0.11676,
+        "relay_received_mean": 0.00196,
+        "relay_received_std": 0.00602,
+        "relay_received_absmax": 0.05795
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 0.02561,
+        "force_ext_hat_std": 0.02299,
+        "force_ext_hat_absmax": 0.11634,
+        "relay_received_mean": 0.0,
+        "relay_received_std": 0.0,
+        "relay_received_absmax": 0.0
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.02142,
+        "force_ext_hat_std": 0.03438,
+        "force_ext_hat_absmax": 0.12685,
+        "relay_received_mean": 0.0002,
+        "relay_received_std": 0.00104,
+        "relay_received_absmax": 0.00813
+      }
+    },
+    "slave_force_summary": {
+      "waist": {
+        "force_ext_hat_mean": 0.00393,
+        "force_ext_hat_std": 0.01208,
+        "force_ext_hat_absmax": 0.11719,
+        "relay_received_mean": -0.00018,
+        "relay_received_std": 0.00703,
+        "relay_received_absmax": 0.03503
+      },
+      "shoulder": {
+        "force_ext_hat_mean": 2e-05,
+        "force_ext_hat_std": 0.00079,
+        "force_ext_hat_absmax": 0.04965,
+        "relay_received_mean": 0.00768,
+        "relay_received_std": 0.0069,
+        "relay_received_absmax": 0.0349
+      },
+      "elbow": {
+        "force_ext_hat_mean": 0.0004,
+        "force_ext_hat_std": 0.00208,
+        "force_ext_hat_absmax": 0.01627,
+        "relay_received_mean": 0.00643,
+        "relay_received_std": 0.01031,
+        "relay_received_absmax": 0.03806
+      }
+    }
+  }
+}

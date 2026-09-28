@@ -1,0 +1,45 @@
+domain: 42
+frame: teleop_4ch_world
+markers: /teleop_4ch_sim/visualization/markers
+demo_topic: /teleop_4ch_sim/visualization/demo
+force_m_per_n: 0.04
+max_arrow_m: 0.12
+expected_hz: 50
+mapping: [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+subscriptions:
+  master:
+    topic: /teleop_4ch_sim/master/controller_telemetry
+    type: touch_haptics/msg/CartesianControllerTelemetry
+    fields:
+      master_position: position_m
+      master_enabled: enabled
+      deadman: deadman_ok
+  slave:
+    topic: /teleop_4ch_sim/slave/controller_telemetry
+    type: touch_haptics/msg/CartesianControllerTelemetry
+    fields:
+      slave_position: position_m
+      target: target_position_m
+      slave_enabled: enabled
+      spring: spring_force_n
+      damping: damping_force_n
+      auxiliary: auxiliary_force_n
+      unclamped: force_before_final_clamp_n
+      primary_clamped: force_after_primary_clamp_n
+      applied: applied_force_n
+      clamped: final_force_clamped
+  bridge:
+    topic: /teleop_4ch_sim/bridge/diagnostics
+    type: touch_haptics/msg/BridgeDiagnostics
+    fields:
+      master_delta: master_relative_m
+      slave_delta: slave_relative_m
+      mapped_master_delta: mapped_master_relative_m
+      bridge_state: bridge_state
+      gravity_alpha: gravity_ramp_alpha
+      coupling_alpha: coupling_ramp_alpha
+      C2_state: c2_enabled
+      C3_state: c3_enabled
+# Optional adapters may map existing, authoritative fields to C1, C4,
+# dob_joint, final_command, master_anchor and slave_anchor.
+# Cartesian DOB is deliberately not adapted without an authoritative conversion.

@@ -31,8 +31,25 @@ PUBLISH_TELEMETRY="${PUBLISH_TELEMETRY:-true}"
 # against it. Deliberately softer than the slave's (35.0 N/m / 0.20 Ns/m,
 # run_slave_right.sh) -- this is a feedback channel felt by a human hand, not
 # a position-tracking slave, and MAX_FORCE_N above is already the harder
-# ceiling. Only takes effect when ENABLE_C2=true; with it false (the
-# default), this script's node params are byte-identical to before C2 existed.
+# ceiling.
+# TO_BE_OPTIMIZED: all four values below are current BASELINE values, not
+# scientifically validated optima -- already configurable (this env-var
+# override IS the configuration mechanism Scientific design process Phase 5
+# needs), no numeric change made here. See
+# docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md's C2 entry.
+#
+# 2026-09-10 fix: these four ros2 params used to be passed to touch_slave
+# ONLY when ENABLE_C2=true. With it false (the normal C3-only production
+# launch), they were never passed at all, so touch_slave.cpp silently used
+# its OWN internal declare_parameter() defaults (8.0 / 0.08 / 0.04 / 0.05 --
+# touch_slave.cpp:271-306) instead of this script's 15.0/0.10/0.03/0.05 --
+# invisible until the bridge's planner_parameter_match_left cross-check
+# caught the exact mismatch on real hardware (K=8.0 D=0.08 errmax=0.04 vs
+# declared 15.0/0.10/0.03). These are the master controller's own operating
+# parameters, not a C2-only concept, so they must always be declared
+# explicitly regardless of ENABLE_C2 -- the bridge's declared planner values
+# and the controller's actual telemetry must never be allowed to silently
+# diverge for any launch mode.
 ENABLE_C2="${ENABLE_C2:-false}"
 LEFT_STIFFNESS_N_PER_M="${LEFT_STIFFNESS_N_PER_M:-15.0}"
 LEFT_DAMPING_N_S_PER_M="${LEFT_DAMPING_N_S_PER_M:-0.10}"
@@ -45,6 +62,11 @@ LEFT_STALE_TIMEOUT_S="${LEFT_STALE_TIMEOUT_S:-0.05}"
 # and its torque ceiling.
 JOINT_SPACE_CONTROL="${JOINT_SPACE_CONTROL:-false}"
 DOB_TORQUE_F_MAX_N="${DOB_TORQUE_F_MAX_N:-0.6}"
+# 2026-09-10: preferred DOB bandwidth sweep mechanism -- scales the shipped
+# per-joint g_dis baseline {10,10,5} rad/s rather than collapsing it to one
+# value (see touch_slave.cpp's dob_g_dis_scale_ / dob_g_dis_override_rad_s_).
+# Default 1.0 leaves g_dis unchanged.
+DOB_G_DIS_SCALE="${DOB_G_DIS_SCALE:-1.0}"
 
 if [[ ! -f "${TOUCH_WS}/install/setup.bash" ]]; then
   echo "[teleop_master][error] missing ${TOUCH_WS}/install/setup.bash" >&2
@@ -74,14 +96,18 @@ if awk -v v="${MAX_FORCE_N}" 'BEGIN { exit !(v > 0.88) }'; then
   echo "[teleop_master][hint] Intentional for a firmer wall; let the motors rest between long sessions." >&2
 fi
 
-c2_params=()
+# Always declared -- these are the master controller's own operating
+# parameters (matched live against the bridge's declared planner values via
+# planner_parameter_match_left), not a C2-only concept. Passing them
+# unconditionally is what keeps touch_slave.cpp from falling back to its
+# own internal defaults regardless of ENABLE_C2.
+controller_params=(
+  -p "stiffness_n_per_m:=${LEFT_STIFFNESS_N_PER_M}"
+  -p "damping_n_s_per_m:=${LEFT_DAMPING_N_S_PER_M}"
+  -p "max_position_error_m:=${LEFT_MAX_POSITION_ERROR_M}"
+  -p "stale_timeout_s:=${LEFT_STALE_TIMEOUT_S}"
+)
 if [[ "${ENABLE_C2}" == "1" || "${ENABLE_C2}" == "true" ]]; then
-  c2_params+=(
-    -p "stiffness_n_per_m:=${LEFT_STIFFNESS_N_PER_M}"
-    -p "damping_n_s_per_m:=${LEFT_DAMPING_N_S_PER_M}"
-    -p "max_position_error_m:=${LEFT_MAX_POSITION_ERROR_M}"
-    -p "stale_timeout_s:=${LEFT_STALE_TIMEOUT_S}"
-  )
   echo "[teleop_master] C2 ON: stiffness=${LEFT_STIFFNESS_N_PER_M} N/m damping=${LEFT_DAMPING_N_S_PER_M} Ns/m" \
     "(bridge must also be started with ENABLE_C2=true)"
 fi
@@ -105,7 +131,8 @@ exec ros2 run touch_haptics touch_slave --ros-args \
   -p publish_telemetry:="${PUBLISH_TELEMETRY}" \
   -p joint_space_control:="${JOINT_SPACE_CONTROL}" \
   -p dob_torque_f_max_n:="${DOB_TORQUE_F_MAX_N}" \
-  "${c2_params[@]}" \
+  -p dob_g_dis_scale:="${DOB_G_DIS_SCALE}" \
+  "${controller_params[@]}" \
   -r pose:=/touch_left/pose \
   -r rpy:=/touch_left/rpy \
   -r buttons:=/touch_left/buttons \

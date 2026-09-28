@@ -1,0 +1,2274 @@
+diff --git a/projects/teleop_left_master_right_slave/docs/CONTROL_ARCHITECTURE_MAPPING.md b/projects/teleop_left_master_right_slave/docs/CONTROL_ARCHITECTURE_MAPPING.md
+index 0cb1999..e88f364 100644
+--- a/projects/teleop_left_master_right_slave/docs/CONTROL_ARCHITECTURE_MAPPING.md
++++ b/projects/teleop_left_master_right_slave/docs/CONTROL_ARCHITECTURE_MAPPING.md
+@@ -4,6 +4,16 @@ Reference: "Learning Contact for Haptic Feedback: Switching X-lateral
+ Teleoperators" (Yilmaz & Tumerdem, ICRA 2024). Produced before any code
+ edit, per the 2026-09-07 diagnose-and-repair task's explicit requirement.
+ 
++> **UPDATE 2026-09-08**: row #10 below and its code excerpt at §2 describe
++> `tau_c1 = w1*Cf*tau_e_hat*mask` (no negation) as traced at the time this
++> document was written. That has since been identified as a sign
++> discrepancy against this project's own decided scientific target
++> (`F_m ≈ -F_s`), confirmed via simulation ground truth, and corrected to
++> `tau_c1 = -w1*Cf*tau_e_hat*mask` on branch `c1-sign-fix-sim-validation`.
++> See `docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md` for the full trace and
++> validation. The excerpts below are left as originally written (a
++> point-in-time trace); do not use them as the current sign reference.
++
+ ## 0. The nomenclature mismatch, precisely (not just "they differ")
+ 
+ The paper's own equations (10)-(13) define, for master control law `Fcm`
+diff --git a/projects/teleop_left_master_right_slave/experiment_launch/.current_session b/projects/teleop_left_master_right_slave/experiment_launch/.current_session
+index 2be450a..476aa8c 100644
+--- a/projects/teleop_left_master_right_slave/experiment_launch/.current_session
++++ b/projects/teleop_left_master_right_slave/experiment_launch/.current_session
+@@ -1 +1 @@
+-/home/nural/HIL-RL/experiment_runs/teleop_setup/fourchannel_01
++/home/nural/HIL-RL/experiment_runs/teleop_setup/20260909T100330Z_dob_observe
+diff --git a/projects/teleop_left_master_right_slave/experiment_launch/07_mark_event.sh b/projects/teleop_left_master_right_slave/experiment_launch/07_mark_event.sh
+index bd9e423..209aeeb 100755
+--- a/projects/teleop_left_master_right_slave/experiment_launch/07_mark_event.sh
++++ b/projects/teleop_left_master_right_slave/experiment_launch/07_mark_event.sh
+@@ -1,20 +1,18 @@
+ #!/usr/bin/env bash
+ set -euo pipefail
+-LAUNCH_DIR="$(cd "$(dirname "$0")" && pwd)"
+-SESSION_ID=""; OUTPUT_DIR=""; LABEL=""
+-while (($#)); do
+-  case "$1" in
+-    --session) SESSION_ID="${2:?}"; shift 2 ;;
+-    --output-dir) OUTPUT_DIR="${2:?}"; shift 2 ;;
+-    --label) LABEL="${2:?}"; shift 2 ;;
+-    *) echo "[event][error] unknown argument: $1" >&2; exit 2 ;;
++EXTRA_ARGS=(); LABEL=""
++source "$(cd "$(dirname "$0")" && pwd)/common.sh"; parse_common_args "$@"
++i=0
++while ((i < ${#EXTRA_ARGS[@]})); do
++  case "${EXTRA_ARGS[$i]}" in
++    --label) LABEL="${EXTRA_ARGS[$((i+1))]:?--label needs a value}"; i=$((i+2)) ;;
++    *) echo "[event][error] unknown argument: ${EXTRA_ARGS[$i]}" >&2; exit 2 ;;
+   esac
+ done
+-[[ -n "$SESSION_ID" && -n "$OUTPUT_DIR" && -n "$LABEL" ]] || {
+-  echo '[event][error] --session, --output-dir and --label are required' >&2; exit 2; }
+-source /opt/ros/humble/setup.bash
+-source /home/nural/HIL-RL/ros2_ws/install/setup.bash
+-session_dir="${OUTPUT_DIR}/${SESSION_ID}"
++[[ -n "$LABEL" ]] || { echo '[event][error] --label is required' >&2; exit 2; }
++require_session
++source_ros
++session_dir="${SESSION_DIR}"
+ mkdir -p "${session_dir}/events"
+ stamp="$(date --iso-8601=ns)"
+ printf '%s\t%s\n' "$stamp" "$LABEL" >>"${session_dir}/events/operator_events.tsv"
+diff --git a/projects/teleop_left_master_right_slave/experiment_launch/OPERATOR_PROCEDURE.md b/projects/teleop_left_master_right_slave/experiment_launch/OPERATOR_PROCEDURE.md
+index 03b66c8..802aab5 100644
+--- a/projects/teleop_left_master_right_slave/experiment_launch/OPERATOR_PROCEDURE.md
++++ b/projects/teleop_left_master_right_slave/experiment_launch/OPERATOR_PROCEDURE.md
+@@ -26,7 +26,7 @@ Choose one session ID and use it unchanged in every terminal.
+ 1. Preflight:
+ 
+    ```bash
+-   cd /home/nural/HIL-RL
++   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
+    projects/teleop_left_master_right_slave/experiment_launch/00_preflight.sh \
+      --session dob_setup_001 --notes "DOB observation only"
+    ```
+@@ -34,7 +34,7 @@ Choose one session ID and use it unchanged in every terminal.
+ 2. Start the disabled left master:
+ 
+    ```bash
+-   cd /home/nural/HIL-RL
++   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
+    projects/teleop_left_master_right_slave/experiment_launch/01_start_master.sh \
+      --session dob_setup_001
+    ```
+@@ -42,7 +42,7 @@ Choose one session ID and use it unchanged in every terminal.
+ 3. Start the disabled right slave:
+ 
+    ```bash
+-   cd /home/nural/HIL-RL
++   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
+    projects/teleop_left_master_right_slave/experiment_launch/02_start_slave.sh \
+      --session dob_setup_001
+    ```
+@@ -50,7 +50,7 @@ Choose one session ID and use it unchanged in every terminal.
+ 4. Verify status before any arming:
+ 
+    ```bash
+-   cd /home/nural/HIL-RL
++   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
+    projects/teleop_left_master_right_slave/experiment_launch/05_show_status.sh \
+      --session dob_setup_001
+    ```
+@@ -64,7 +64,7 @@ Choose one session ID and use it unchanged in every terminal.
+    separate hardware arming action. Its exact command is:
+ 
+    ```bash
+-   cd /home/nural/HIL-RL
++   cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
+    projects/teleop_left_master_right_slave/experiment_launch/03_start_position_bridge.sh \
+      --session dob_setup_001 --arm-position
+    ```
+@@ -80,7 +80,7 @@ Choose one session ID and use it unchanged in every terminal.
+ Normal shutdown and emergency software stop use the same targeted command:
+ 
+ ```bash
+-cd /home/nural/HIL-RL
++cd <path to this repo root>  # e.g. ~/HIL-RL, or wherever this portable copy was placed
+ projects/teleop_left_master_right_slave/experiment_launch/99_stop_setup.sh \
+   --session dob_setup_001
+ ```
+diff --git a/projects/teleop_left_master_right_slave/scripts/bilateral_4ch.py b/projects/teleop_left_master_right_slave/scripts/bilateral_4ch.py
+index eed7caf..0421b60 100644
+--- a/projects/teleop_left_master_right_slave/scripts/bilateral_4ch.py
++++ b/projects/teleop_left_master_right_slave/scripts/bilateral_4ch.py
+@@ -74,6 +74,18 @@ from touch_haptics.msg import BilateralStatus, ForceEstimate
+ JOINTS = ("waist", "shoulder", "elbow")
+ 
+ # C1, C2, C3, C4
++#
++# BASELINE / LEGACY COMMISSIONING VALUES -- NOT SCIENTIFIC OPTIMA.
++# "4ch_safe"'s 0.5/0.3 (C1/C4) in particular were never derived from a
++# defined transparency objective, sweep, or optimization run -- no such
++# evidence exists anywhere in this repo (see
++# docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md's C1/C4 weight
++# entries, classified ARBITRARY / BASELINE_ONLY). They are conservative
++# starting points used during hardware bring-up, kept unchanged here
++# per this task's explicit instruction not to invent replacement gains.
++# Any future gain optimization (Scientific design process Phase 6) must
++# treat every value below as a baseline point to compare against, not a
++# validated target.
+ PRESETS = {
+     "unilateral": (0.0, 0.0, 1.0, 0.0),
+     "pp": (0.0, 1.0, 1.0, 0.0),
+@@ -215,6 +227,20 @@ class BilateralController(Node):
+         self.weights: List[float] = list(target)  # ramped state, starts at target
+         self.architecture = args.architecture
+ 
++        # SAFETY_ONLY / LEGACY_COMMISSIONING_PRESET, not a scientific default:
++        # --c1-disable-joints defaults to "shoulder" (see its argparse help
++        # below) because shoulder's DOB noise floor was found to meet or
++        # exceed its own torque budget on THIS specific hardware (measured,
++        # touch_slave.cpp's kGDis/kThreshold comment). That is a per-rig
++        # commissioning finding, not a property of the ideal scientific
++        # 4-channel controller, which is architecturally capable of relaying
++        # all 3 joints (waist, shoulder, elbow) -- pass --c1-disable-joints=""
++        # to run the full 3-joint path once shoulder's estimator is
++        # separately improved or a graded (non-hard-mask) alternative is
++        # adopted; see docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md's
++        # shoulder-mask entry for the untried graded alternatives. The
++        # default value itself is NOT changed here -- doing so would require
++        # a REQUIRES_USER_DECISION per docs/SCIENTIFIC_4CH_DESIGN_PROCESS.md.
+         disabled = {
+             name.strip() for name in args.c1_disable_joints.split(",") if name.strip()
+         }
+@@ -436,9 +462,18 @@ class BilateralController(Node):
+         self.right_enable_pub.publish(enable_msg2)
+ 
+         # ---- C1: slave contact torque -> master ----
++        # SIGN: -w1 (opposing/reactive convention, F_m ~= -F_s), matching this
++        # file's own docstring above and confirmed as the project's decided
++        # scientific target 2026-09-08. Prior to this fix the code carried NO
++        # negation here (a same-direction/mirror relay), confirmed via
++        # simulation ground truth to disagree with that target -- see
++        # docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md and
++        # analysis/scientific_4ch/test_c1_sign_vs_ground_truth.py. This
++        # correction is simulation-validated only; REQUIRES_FUTURE_HARDWARE_VALIDATION
++        # before use on physical devices.
+         tau_e_hat = list(self.right_fe.tau_ext_deadbanded_nm) if right_fe_valid else [0.0, 0.0, 0.0]
+         tau_c1 = [
+-            w1_eff * self.args.cf * v * m for v, m in zip(tau_e_hat, self.c1_joint_mask)
++            -w1_eff * self.args.cf * v * m for v, m in zip(tau_e_hat, self.c1_joint_mask)
+         ]
+ 
+         # ---- C4: master hand torque -> slave ----
+@@ -603,6 +638,7 @@ class BilateralController(Node):
+         # this script has no visibility into. Documented, not measured.
+         msg.master_torque_cmd_nm = [float(v) for v in tau_c1]
+         msg.slave_torque_cmd_nm = [float(v) for v in tau_c4]
++        msg.c1_joint_mask = [float(m) for m in self.c1_joint_mask]
+ 
+         msg.master_budget_used = max(
+             (abs(tau_c1[i]) / MAX_TORQUE_NM[i] for i in range(3)), default=0.0)
+@@ -630,6 +666,13 @@ class BilateralController(Node):
+ def parse_args() -> argparse.Namespace:
+     p = argparse.ArgumentParser(
+         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
++    # ---- PERFORMANCE CONTROLLER (transparency tuning, NOT safety) ----
++    # Everything in this block trades off transparency/performance and is a
++    # BASELINE / LEGACY value, not a validated scientific optimum -- see
++    # docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md. Do not read a
++    # default here as "the correct value"; changing these cannot violate a
++    # hard safety limit (the SAFETY ENVELOPE block further down is what
++    # actually protects the operator/hardware regardless of these choices).
+     p.add_argument("--architecture", default="pp",
+                    help=f"one of {sorted(PRESETS)} or 'custom' (use --w1..--w4)")
+     p.add_argument("--w1", type=float, default=0.0, help="C1 weight, custom architecture only")
+@@ -641,13 +684,19 @@ def parse_args() -> argparse.Namespace:
+                         "devices at 1:1 scaling; any other value breaks power conservation "
+                         "and must be a deliberate, documented choice (plan Sec 2.1).")
+     p.add_argument("--c1-disable-joints", default="shoulder",
+-                   help="Comma-separated joint names (from waist,shoulder,elbow) whose C1 "
++                   help="SAFETY_ONLY / LEGACY_COMMISSIONING_PRESET, not a scientific "
++                        "default -- the ideal 3-joint controller supports relaying all of "
++                        "waist,shoulder,elbow; this default reflects a per-rig commissioning "
++                        "finding, not a design decision about the controller itself. "
++                        "Comma-separated joint names (from waist,shoulder,elbow) whose C1 "
+                         "contribution is forced to zero before weighting/relay. Default "
+                         "excludes shoulder: the right-arm DOB replay verification found its "
+                         "noise/friction floor meets or exceeds its own torque budget at every "
+                         "filter cutoff tested (2026-09-01), so its force_ext_hat is not fit "
+                         "for relaying to the master. Waist and elbow have workable headroom. "
+-                        "Pass '' to relay all three once/if the shoulder fit is fixed.")
++                        "Pass '' to relay all three once/if the shoulder fit is fixed, or once "
++                        "a graded (non-hard-mask) alternative replaces this preset -- see "
++                        "docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md.")
+ 
+     p.add_argument("--left-force-topic", default="/touch_left/force_ext_hat")
+     p.add_argument("--right-force-topic", default="/touch_right/force_ext_hat")
+@@ -671,6 +720,17 @@ def parse_args() -> argparse.Namespace:
+     p.add_argument("--rate-hz", type=float, default=200.0,
+                    help="Must be >= the slower node's stale_timeout_s^-1 or channels will "
+                         "read STALE between ticks.")
++
++    # ---- SAFETY ENVELOPE (hard mechanisms, NOT tuning parameters) ----
++    # stale-timeout-s, the energy tank, and the oscillation-abort trip below
++    # exist to bound risk regardless of how the PERFORMANCE CONTROLLER block
++    # above is configured -- they are not part of the scientific transparency
++    # objective and must not be treated as gains to optimize for better
++    # "feel". Their specific numeric values are themselves still
++    # ARBITRARY/not-derived-from-a-passivity-margin (see the assumption
++    # register), but the MECHANISM (some hard bound must exist) is a
++    # genuine safety requirement, not a design preference -- this task's
++    # own rules forbid weakening any of it, and nothing below was changed.
+     p.add_argument("--stale-timeout-s", type=float, default=0.1)
+     p.add_argument("--ramp-time-s", type=float, default=0.5,
+                    help="Full-scale weight ramp time. A step in w1 is a step force into a hand.")
+diff --git a/projects/teleop_left_master_right_slave/scripts/bridge_master_slave.py b/projects/teleop_left_master_right_slave/scripts/bridge_master_slave.py
+index d8eeb0f..a34ed8d 100755
+--- a/projects/teleop_left_master_right_slave/scripts/bridge_master_slave.py
++++ b/projects/teleop_left_master_right_slave/scripts/bridge_master_slave.py
+@@ -38,7 +38,10 @@ from rcl_interfaces.msg import SetParametersResult
+ from std_msgs.msg import Bool, Int32
+ 
+ from startup_alignment import AlignmentConfig, TeleopStartupAlignment
+-from touch_haptics.msg import BridgeDiagnostics
++from coupling_force_budget import (
++    AdaptiveCouplingRamp, ArmState, ForceBudgetConfig, CouplingRampStalled, _norm,
++)
++from touch_haptics.msg import BridgeDiagnostics, CartesianControllerTelemetry
+ 
+ AXIS_INDEX = {"x": 0, "y": 1, "z": 2}
+ 
+@@ -90,6 +93,32 @@ def parse_axis_map(spec: str) -> list[tuple[int, float]]:
+     return parsed
+ 
+ 
++def _params_match(telem, stiffness_n_per_m: float, damping_n_s_per_m: float,
++                  max_force_n: float, max_position_error_m: float,
++                  rel_tol: float = 1e-6, abs_tol: float = 1e-9) -> bool:
++    """True when the bridge's DECLARED planner parameters agree with what the
++    controller's own telemetry says it is actually running (2026-09-09,
++    Part 4). Strict by design: these are configuration constants, not
++    measured signals, so they should agree exactly -- any disagreement means
++    the launch config and the running rig genuinely differ."""
++    def close(a: float, b: float) -> bool:
++        return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
++    return (close(telem.stiffness_n_per_m, stiffness_n_per_m)
++            and close(telem.damping_n_s_per_m, damping_n_s_per_m)
++            and close(telem.max_force_n, max_force_n)
++            and close(telem.max_position_error_m, max_position_error_m))
++
++
++def ramped_gravity_comp_n(configured_n: float, ramp_alpha: float) -> float:
++    """Pure function (2026-09-09, arm/disarm force-contract task): the
++    gravity-compensation bias must be zero while unarmed and reach exactly
++    configured_n once ACTIVE, using the same ramp_alpha that already gates
++    the C2/C3 position targets -- so a bridge configured for a different
++    SLAVE_GRAVITY_COMP_N is not already physically distinguishable from
++    another configuration before either one is armed."""
++    return configured_n * ramp_alpha
++
++
+ def apply_axis_map(amap: list[tuple[int, float]], v: list[float]) -> list[float]:
+     """master delta -> slave delta."""
+     return [sign * v[src] for src, sign in amap]
+@@ -108,6 +137,115 @@ def apply_axis_map_inverse(amap: list[tuple[int, float]], v: list[float]) -> lis
+     return out
+ 
+ 
++def compute_c2_target(slave_pos: list[float], right_anchor: list[float],
++                       left_anchor: list[float], axis_map: list[tuple[int, float]],
++                       axis_scale: list[float], left_max_offset_m: float,
++                       absolute_axes: Optional[set[int]] = None,
++                       absolute_trim: Optional[list[float]] = None) -> tuple[list[float], bool]:
++    """C2 (slave position -> master target). Pure function, extracted from
++    _update_c2() (2026-09-09, root-cause investigation of the READY->ACTIVE
++    target discontinuity) so it is unit-testable without a live rclpy Node,
++    and so its absolute-axes handling can be kept in sync with _tick()'s C3
++    path by construction instead of by convention.
++
++    BUG FIXED HERE (see docs/... root-cause note): the original _update_c2()
++    had NO absolute_axes handling at all -- it unconditionally used the
++    anchor-relative formula `left_anchor + (slave_pos - right_anchor)` even
++    when the C3 direction (in _tick()) was overriding those same axes to the
++    ABSOLUTE formula `target = master_pos`. Whenever left_anchor and
++    right_anchor differ (captured at bridge startup, from whatever pose the
++    two devices happened to be resting at -- NOT necessarily matched), this
++    mismatch alone becomes a constant, uncancelled offset in C2's target,
++    with NOTHING to do with the operator's actual reference-pose match at
++    arm time. Measured on real hardware: a 91mm anchor mismatch produced a
++    matching ~91mm master target error, pinning the master's position-error
++    clamp at 100% for an entire 19s trial (session
++    20260909T100330Z_dob_observe, trial h2abs_gravcomp_B2_070).
++
++    Returns (left_target, master_travel_limit_flag).
++    """
++    if absolute_axes is None:
++        absolute_axes = set()
++    if absolute_trim is None:
++        absolute_trim = [0.0, 0.0, 0.0]
++    slave_disp = [slave_pos[i] - right_anchor[i] for i in range(3)]
++    unscaled = [
++        slave_disp[i] / axis_scale[i] if abs(axis_scale[i]) > 1e-9 else 0.0
++        for i in range(3)
++    ]
++    master_disp = apply_axis_map_inverse(axis_map, unscaled)
++    master_travel_limit_flag = False
++    limit = float(left_max_offset_m)
++    if limit > 0.0:
++        for i in range(3):
++            if i in absolute_axes:
++                continue  # absolute axes are not anchor-offset-limited; see below
++            if master_disp[i] > limit:
++                master_disp[i] = limit
++                master_travel_limit_flag = True
++            elif master_disp[i] < -limit:
++                master_disp[i] = -limit
++                master_travel_limit_flag = True
++    left_target = [left_anchor[i] + master_disp[i] for i in range(3)]
++    # Absolute axes ignore the anchor entirely and command the slave's own
++    # raw coordinate directly -- the exact mirror of _tick()'s C3 override
++    # (bridge_master_slave.py's existing absolute_axes block), so C2 and C3
++    # agree on which frame each axis lives in instead of silently disagreeing.
++    for i in absolute_axes:
++        left_target[i] = slave_pos[i] * axis_scale[i] + absolute_trim[i]
++    return left_target, master_travel_limit_flag
++
++
++def compute_c3_target(master_pos: list[float], left_anchor: list[float], right_anchor: list[float],
++                       axis_map: list[tuple[int, float]], axis_scale: list[float],
++                       deadband_m: float, max_offset: list[float], max_offset_mode: str,
++                       absolute_axes: Optional[list[int]] = None,
++                       absolute_trim: Optional[list[float]] = None) -> tuple[list[float], bool]:
++    """C3 (master position -> slave target). Pure function, extracted from
++    _tick() (2026-09-09, Phase 2 of the C2/C3 frame-mixing root-cause
++    investigation) alongside compute_c2_target(), purely so the two can be
++    unit-tested for symmetry -- this is a refactor for testability, the
++    actual formula (including the absolute_axes override) is unchanged from
++    the pre-existing _tick() code.
++
++    Returns (target, slave_travel_limit_flag).
++    """
++    if absolute_axes is None:
++        absolute_axes = []
++    if absolute_trim is None:
++        absolute_trim = [0.0, 0.0, 0.0]
++    delta = [master_pos[i] - left_anchor[i] for i in range(3)]
++    for i in range(3):
++        if abs(delta[i]) < deadband_m:
++            delta[i] = 0.0
++    mapped = apply_axis_map(axis_map, delta)
++    mapped = [mapped[i] * axis_scale[i] for i in range(3)]
++    slave_travel_limit_flag = False
++    if str(max_offset_mode) == "norm":
++        norm_val = math.sqrt(sum(v * v for v in mapped))
++        limit_norm = max_offset[0] if max_offset else 0.0
++        if limit_norm > 0.0 and norm_val > limit_norm:
++            shrink = limit_norm / norm_val
++            mapped = [v * shrink for v in mapped]
++            slave_travel_limit_flag = True
++    else:
++        for i in range(3):
++            limit = max_offset[i] if i < len(max_offset) else 0.0
++            if limit > 0.0:
++                if mapped[i] > limit:
++                    mapped[i] = limit
++                    slave_travel_limit_flag = True
++                elif mapped[i] < -limit:
++                    mapped[i] = -limit
++                    slave_travel_limit_flag = True
++    target = [right_anchor[i] + mapped[i] for i in range(3)]
++    if absolute_axes:
++        abs_master = apply_axis_map(axis_map, master_pos)
++        for i in absolute_axes:
++            target[i] = abs_master[i] * axis_scale[i] + absolute_trim[i]
++    return target, slave_travel_limit_flag
++
++
+ class MasterSlaveBridge(Node):
+     def __init__(self, args: argparse.Namespace) -> None:
+         super().__init__("touch_master_slave_bridge")
+@@ -145,6 +283,43 @@ class MasterSlaveBridge(Node):
+             max_alignment_error_m=args.alignment_max_error_m,
+             ramp_duration_s=args.alignment_ramp_s,
+         ))
++        # Bilateral force-budget-aware coupling ramp (2026-09-09,
++        # production-integration task) -- see coupling_force_budget.py's
++        # module docstring.
++        #
++        # 2026-09-09 Part 1 (validation-infrastructure follow-up) origin-mode
++        # fix: this used to be origin_mode="snapshot", but
++        # startup_alignment.py's blend_target()/blend_left_target() -- the
++        # functions that compute what is ACTUALLY published to the real
++        # controller -- always use the continuously-live pose as origin,
++        # unconditionally, with no knowledge of this module's snapshot. That
++        # meant the planner was certifying the safety of a DIFFERENT
++        # trajectory than the one actually sent to the hardware -- a real
++        # planner/publish mismatch, not just a diagnostics-labeling issue.
++        # SNAPSHOT_ORIGIN was originally chosen because MOVING_LIVE_ORIGIN
++        # deadlocked (see coupling_force_budget.py's test history) -- but
++        # that deadlock was reproduced-and-confirmed-GONE against today's
++        # code (a physics-integrated convergence check: both modes now reach
++        # alpha=1.0 with no stall). Root cause of the old deadlock was the
++        # missing per-axis position-error clamp in predict_force_vector(),
++        # added later in this same session (the controller-predictor audit
++        # correction) -- not something inherent to MOVING_LIVE_ORIGIN.
++        # origin_mode="moving" now matches blend_target()/blend_left_target()
++        # exactly, so the planner vets the actual published trajectory.
++        self._coupling_ramp = AdaptiveCouplingRamp(
++            ForceBudgetConfig(
++                max_force_n=args.slave_max_force_n,  # per-arm max_force_n is passed per-call via ArmState;
++                force_reserve_n=args.force_budget_reserve_n,  # this ForceBudgetConfig field is otherwise unused
++                nominal_duration_s=args.alignment_ramp_s,
++                stall_timeout_s=args.force_budget_stall_timeout_s,
++            ), origin_mode="moving")
++        self._prev_coupling_state = None
++        self._telemetry_stale_since = None
++        # Part 4 diagnostics: whether the DECLARED planner params agree with
++        # the controller's own telemetry. True until proven otherwise (they
++        # are only evaluated once COUPLING_RAMP_UP has live telemetry).
++        self._planner_param_match_left = True
++        self._planner_param_match_right = True
+         self._calibration_written = False
+         # Populated by _update_c2() when C2 is on; stay at these safe
+         # defaults (zero delta, no limit hit) when it never runs.
+@@ -201,6 +376,27 @@ class MasterSlaveBridge(Node):
+             self.create_subscription(
+                 Vector3Stamped, args.right_joint_angles_topic,
+                 lambda m: self.alignment.update_slave_q([m.vector.x, m.vector.y, m.vector.z]), 10)
++        # Force-budget planner input (2026-09-09, production-integration
++        # task): the controller's OWN velocity/position/force telemetry --
++        # NOT a bridge-side finite-difference estimate. touch_slave.cpp
++        # computes damping_force from HD_CURRENT_VELOCITY (the device
++        # driver's native readout), which a bridge-side pose-diff estimate
++        # cannot reproduce exactly (see coupling_force_budget.py's module
++        # docstring / the controller-predictor audit that motivated this).
++        # Subscribing to the controller's own already-published
++        # velocity_mps closes that gap to one message-passing tick instead
++        # of leaving it unquantified.
++        self.left_telemetry = None
++        self.left_telemetry_t = None
++        self.right_telemetry = None
++        self.right_telemetry_t = None
++        self.create_subscription(
++            CartesianControllerTelemetry, args.left_telemetry_topic,
++            self._left_telemetry_cb, 10)
++        self.create_subscription(
++            CartesianControllerTelemetry, args.right_telemetry_topic,
++            self._right_telemetry_cb, 10)
++
+         self.create_subscription(Int32, args.left_buttons_topic, self._buttons_cb, 10)
+         if args.report or args.reflect_enable:
+             self.create_subscription(
+@@ -299,6 +495,12 @@ class MasterSlaveBridge(Node):
+             if p.name == "arm_teleop" and p.value:
+                 self.alignment.arm()
+                 self.get_logger().warn("arm_teleop: alignment armed, ramping if READY")
++            if p.name == "arm_teleop" and not p.value:
++                self.alignment.disarm()
++                self.get_logger().warn(
++                    "arm_teleop: alignment disarmed, re-anchored to current pose, "
++                    "back to READY (no-op if not RAMPING/ACTIVE)"
++                )
+             if p.name == "reset_alignment" and p.value:
+                 self.alignment.reset()
+                 self._calibration_written = False
+@@ -312,6 +514,21 @@ class MasterSlaveBridge(Node):
+         mapped = apply_axis_map(self.axis_map, pos)
+         return [mapped[i] * self.axis_scale[i] for i in range(3)]
+ 
++    def _left_telemetry_cb(self, msg: CartesianControllerTelemetry) -> None:
++        self.left_telemetry = msg
++        self.left_telemetry_t = time.time()
++        # 2026-09-09 GRAVITY_SETTLE revision: feed the controller's own
++        # velocity_mps (the same field the force-budget predictor already
++        # uses) into the alignment state machine so GRAVITY_SETTLE can gate
++        # on actual mechanical quiescence instead of a fixed clock -- see
++        # startup_alignment.py's module docstring / GRAVITY_SETTLE comments.
++        self.alignment.update_master_velocity(list(msg.velocity_mps))
++
++    def _right_telemetry_cb(self, msg: CartesianControllerTelemetry) -> None:
++        self.right_telemetry = msg
++        self.right_telemetry_t = time.time()
++        self.alignment.update_slave_velocity(list(msg.velocity_mps))
++
+     def _left_cb(self, msg: PoseStamped) -> None:
+         self.latest_left = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
+         # time.time(), not the ROS clock -- matches startup_alignment.py's
+@@ -453,6 +670,8 @@ class MasterSlaveBridge(Node):
+             self._report_waiting()
+             return
+ 
++        self._update_force_budget_coupling()
++
+         if not self.ready_announced:
+             self.ready_announced = True
+             self.get_logger().info("both devices are publishing, teleoperation live")
+@@ -490,46 +709,23 @@ class MasterSlaveBridge(Node):
+         if abs(delta[2]) < self.args.deadband_m:
+             delta[2] = 0.0
+ 
++        # Diagnostic only (pre-clamp, anchor-relative delta) -- matches the
++        # pre-existing mapped_unclamped convention regardless of
++        # absolute_axes, same reasoning as C2's _c2_mapped_slave_relative.
+         mapped_unclamped = apply_axis_map(self.axis_map, delta)
+         mapped_unclamped = [mapped_unclamped[i] * self.axis_scale[i] for i in range(3)]
+-        mapped = list(mapped_unclamped)
+-        slave_travel_limit_flag = False
+-
+-        if str(self.args.max_offset_mode) == "norm":
+-            # Original behaviour. Shrinks the whole vector so its length fits,
+-            # which couples the axes but also keeps total travel bounded --
+-            # per-axis limits allow up to sqrt(3) times more combined reach.
+-            norm = math.sqrt(sum(v * v for v in mapped))
+-            if norm > self.args.max_offset_m and norm > 1e-9:
+-                shrink = self.args.max_offset_m / norm
+-                mapped = [v * shrink for v in mapped]
+-                slave_travel_limit_flag = True
+-        else:
+-            # Clamp each axis on its own. A norm clamp couples the axes: run out
+-            # of travel on one and the others get squashed too, which reads as
+-            # the slave mysteriously refusing to follow.
++
++        target, slave_travel_limit_flag = compute_c3_target(
++            self.latest_left, self.alignment.left_anchor, self.alignment.right_anchor,
++            self.axis_map, self.axis_scale, self.args.deadband_m, self.max_offset,
++            self.args.max_offset_mode, absolute_axes=self.absolute_axes,
++            absolute_trim=self.absolute_trim,
++        )
++        if slave_travel_limit_flag and str(self.args.max_offset_mode) != "norm":
+             for i in range(3):
+                 limit = self.max_offset[i]
+-                if limit > 0.0:
+-                    if mapped[i] > limit:
+-                        mapped[i] = limit
+-                        slave_travel_limit_flag = True
+-                        self._note_limit(i)
+-                    elif mapped[i] < -limit:
+-                        mapped[i] = -limit
+-                        slave_travel_limit_flag = True
+-                        self._note_limit(i)
+-
+-        target = [self.alignment.right_anchor[i] + mapped[i] for i in range(3)]
+-
+-        # Absolute axes ignore the anchor and command the master's own
+-        # coordinate, so the slave holds the same height as your hand rather
+-        # than the same displacement. Clutching no longer re-zeroes these axes,
+-        # which is the point: the offset is what we are removing.
+-        if self.absolute_axes:
+-            abs_master = apply_axis_map(self.axis_map, self.latest_left)
+-            for i in self.absolute_axes:
+-                target[i] = abs_master[i] * self.axis_scale[i] + self.absolute_trim[i]
++                if limit > 0.0 and abs(mapped_unclamped[i]) > limit + 1e-9:
++                    self._note_limit(i)
+ 
+         # Startup ramp, applied at the safest mathematically consistent
+         # location (see startup_alignment.py's module docstring): blends
+@@ -560,7 +756,7 @@ class MasterSlaveBridge(Node):
+         self.prev_target = list(target)
+ 
+         for i in range(3):
+-            self.peak_cmd[i] = max(self.peak_cmd[i], abs(mapped[i]))
++            self.peak_cmd[i] = max(self.peak_cmd[i], abs(mapped_unclamped[i]))
+             if self.latest_right is not None and self.alignment.right_anchor is not None:
+                 self.peak_act[i] = max(
+                     self.peak_act[i], abs(self.latest_right[i] - self.alignment.right_anchor[i]))
+@@ -604,12 +800,191 @@ class MasterSlaveBridge(Node):
+         msg.follow_error_m = math.sqrt(sum(v * v for v in c3_err))
+         msg.bridge_state = self.alignment.state
+         msg.ramp_alpha = float(self.alignment.ramp_alpha)
++        msg.gravity_ramp_alpha = float(self.alignment.gravity_ramp_alpha)
++        msg.coupling_ramp_alpha = float(self.alignment.coupling_ramp_alpha)
+         msg.c2_enabled = bool(self.args.enable_c2)
+         msg.c3_enabled = True
+         msg.master_travel_limit_flag = bool(self._master_travel_limit_flag)
+         msg.slave_travel_limit_flag = bool(slave_travel_limit_flag)
++        cr = self._coupling_ramp
++        # 2026-09-09 Part 1 audit fix: publish accepted (published-target,
++        # safety-relevant) and candidate (last-bisection-trial, explanatory
++        # only) margins as separate fields -- see coupling_force_budget.py's
++        # AdaptiveCouplingRamp docstring and BridgeDiagnostics.msg's matching
++        # comment for why these must never be conflated.
++        def _f(attr):
++            v = getattr(cr, attr, None)
++            return float(v) if v is not None else 0.0
++        msg.master_accepted_force_budget_margin_n = _f("last_master_accepted_force_margin_n")
++        msg.slave_accepted_force_budget_margin_n = _f("last_slave_accepted_force_margin_n")
++        msg.master_accepted_position_error_margin_m = _f("last_master_accepted_position_margin_m")
++        msg.slave_accepted_position_error_margin_m = _f("last_slave_accepted_position_margin_m")
++        msg.master_candidate_force_budget_margin_n = _f("last_master_candidate_force_margin_n")
++        msg.slave_candidate_force_budget_margin_n = _f("last_slave_candidate_force_margin_n")
++        msg.master_candidate_position_error_margin_m = _f("last_master_candidate_position_margin_m")
++        msg.slave_candidate_position_error_margin_m = _f("last_slave_candidate_position_margin_m")
++        msg.coupling_ramp_held = bool(cr.last_held)
++        msg.coupling_ramp_stall_time_s = float(cr.stall_elapsed_s(time.time()))
++        now = time.time()
++        msg.force_budget_telemetry_fresh_left = (
++            self.left_telemetry_t is not None
++            and now - self.left_telemetry_t <= self.args.force_budget_telemetry_stale_s)
++        msg.force_budget_telemetry_fresh_right = (
++            self.right_telemetry_t is not None
++            and now - self.right_telemetry_t <= self.args.force_budget_telemetry_stale_s)
++        msg.master_predicted_force_n = [float(v) for v in (cr.last_master_predicted_force_n or [0.0, 0.0, 0.0])]
++        msg.slave_predicted_force_n = [float(v) for v in (cr.last_slave_predicted_force_n or [0.0, 0.0, 0.0])]
++        msg.planner_parameter_match_left = bool(self._planner_param_match_left)
++        msg.planner_parameter_match_right = bool(self._planner_param_match_right)
++        # 2026-09-09 Part 3/5 (validation-infrastructure follow-up):
++        # GRAVITY_SETTLE observability, published so the recorder and live
++        # tests can see it, not just the pure alignment.diagnostics() dict.
++        al = self.alignment
++        def _o(attr):
++            v = getattr(al, attr, None)
++            return float(v) if v is not None else 0.0
++        msg.gravity_settle_master_speed_mps = _o("master_settle_velocity_norm_mps")
++        msg.gravity_settle_slave_speed_mps = _o("slave_settle_velocity_norm_mps")
++        msg.gravity_settle_master_pose_drift_m = _o("master_settle_pose_drift_m")
++        msg.gravity_settle_slave_pose_drift_m = _o("slave_settle_pose_drift_m")
++        msg.gravity_settle_quiet_window_accumulated_s = _o("settle_quiet_window_accumulated_s")
++        msg.gravity_settle_accepted_master_pose_drift_m = _o("last_accepted_settle_master_pose_drift_m")
++        msg.gravity_settle_accepted_slave_pose_drift_m = _o("last_accepted_settle_slave_pose_drift_m")
+         self.bridge_diag_pub.publish(msg)
+ 
++    def _update_force_budget_coupling(self) -> None:
++        """Drives coupling_ramp_alpha during COUPLING_RAMP_UP via the
++        bilateral force-budget planner (2026-09-09 production-integration
++        task) instead of the old fixed-time ramp. No-op in every other
++        state -- gravity phases, ACTIVE, and the disarm-side ramp-down are
++        all untouched by this method (Part 4 scope: arm-side only)."""
++        state = self.alignment.state
++        if state != "COUPLING_RAMP_UP":
++            self._prev_coupling_state = state
++            self._telemetry_stale_since = None
++            return
++
++        if self._prev_coupling_state != "COUPLING_RAMP_UP":
++            # Fresh entry into COUPLING_RAMP_UP this tick -- capture SNAPSHOT
++            # origins now, from wherever the devices actually are (Part 4:
++            # "at entry: capture fresh master/slave snapshot origin").
++            self.alignment.external_coupling_alpha_control = True
++            self._coupling_ramp.start_bilateral(
++                now=time.time(), master_origin_pose=list(self.latest_left),
++                slave_origin_pose=list(self.latest_right) if self.latest_right is not None else list(self.latest_left))
++            self._telemetry_stale_since = None
++            m_speed = (_norm(list(self.left_telemetry.velocity_mps))
++                      if self.left_telemetry is not None else float("nan"))
++            s_speed = (_norm(list(self.right_telemetry.velocity_mps))
++                      if self.right_telemetry is not None else float("nan"))
++            m_drift = self.alignment.last_accepted_settle_master_pose_drift_m
++            s_drift = self.alignment.last_accepted_settle_slave_pose_drift_m
++            self.get_logger().warn(
++                f"COUPLING_RAMP_UP: force-budget planner armed (origin_mode=moving, matches "
++                f"blend_target()/blend_left_target() exactly; entered after GRAVITY_SETTLE's "
++                f"velocity-gated quiet-hold was satisfied), "
++                f"master_pose={self.latest_left} master_speed={m_speed*1000:.3f}mm/s "
++                f"master_settle_pose_drift={(m_drift*1000 if m_drift is not None else float('nan')):.4f}mm "
++                f"slave_pose={self.latest_right} slave_speed={s_speed*1000:.3f}mm/s "
++                f"slave_settle_pose_drift={(s_drift*1000 if s_drift is not None else float('nan')):.4f}mm")
++        self._prev_coupling_state = state
++
++        if self.latest_right is None:
++            return  # nothing to couple toward yet
++
++        now = time.time()
++        left_fresh = (self.left_telemetry_t is not None
++                      and now - self.left_telemetry_t <= self.args.force_budget_telemetry_stale_s)
++        right_fresh = (self.right_telemetry_t is not None
++                       and now - self.right_telemetry_t <= self.args.force_budget_telemetry_stale_s)
++        if not (left_fresh and right_fresh):
++            # Part 1: HOLD alpha (do not call step_bilateral at all this
++            # tick -- an untrusted velocity estimate must never be used,
++            # not even as a fallback) and track how long telemetry has been
++            # stale, faulting explicitly rather than holding forever.
++            if self._telemetry_stale_since is None:
++                self._telemetry_stale_since = now
++            elif now - self._telemetry_stale_since > self.args.force_budget_stall_timeout_s:
++                self.get_logger().error(
++                    f"COUPLING_RAMP_TELEMETRY_STALE: left_fresh={left_fresh} right_fresh={right_fresh} "
++                    f"for {now - self._telemetry_stale_since:.2f}s -- forcing FAULT")
++                self.alignment.trigger_fault("COUPLING_RAMP_TELEMETRY_STALE")
++            return
++        self._telemetry_stale_since = None
++
++        master_full_target, _ = compute_c2_target(
++            self.latest_right, self.alignment.right_anchor, self.alignment.left_anchor,
++            self.axis_map, self.axis_scale, float(self.args.left_max_offset_m),
++            absolute_axes=self.absolute_axes, absolute_trim=self.absolute_trim,
++        )
++        slave_full_target, _ = compute_c3_target(
++            self.latest_left, self.alignment.left_anchor, self.alignment.right_anchor,
++            self.axis_map, self.axis_scale, self.args.deadband_m, self.max_offset,
++            self.args.max_offset_mode, absolute_axes=self.absolute_axes, absolute_trim=self.absolute_trim,
++        )
++
++        left_aux = [0.0, 0.0, 0.0]
++        left_aux[self.args.left_gravity_axis] = ramped_gravity_comp_n(
++            float(self.args.left_gravity_comp_n), self.alignment.gravity_ramp_alpha)
++        right_aux = [0.0, 0.0, 0.0]
++        right_aux[self.args.slave_gravity_axis] = ramped_gravity_comp_n(
++            float(self.args.slave_gravity_comp_n), self.alignment.gravity_ramp_alpha)
++
++        # PARAMETER SOURCE (2026-09-09, Part 4 of the validation-infrastructure
++        # task): the CONTROLLER'S OWN telemetry is authoritative, not the
++        # bridge's CLI args. touch_slave.cpp publishes the exact
++        # stiffness/damping/max_position_error/max_force it is actually
++        # running with, so the planner uses those directly and cannot
++        # silently predict against values the controller isn't using. The CLI
++        # args are kept ONLY as a declared expectation, cross-checked below --
++        # a disagreement means the launch config (and therefore the session
++        # manifest) is wrong about the rig, which is a provenance defect worth
++        # faulting on rather than quietly overriding.
++        lt, rt = self.left_telemetry, self.right_telemetry
++        self._planner_param_match_left = _params_match(
++            lt, self.args.master_stiffness_n_per_m, self.args.master_damping_n_s_per_m,
++            self.args.master_max_force_n, self.args.master_max_position_error_m)
++        self._planner_param_match_right = _params_match(
++            rt, self.args.stiffness_n_per_m, self.args.slave_damping_n_s_per_m,
++            self.args.slave_max_force_n, self.args.slave_max_position_error_m)
++        if not (self._planner_param_match_left and self._planner_param_match_right):
++            self.get_logger().error(
++                f"COUPLING_RAMP_PARAMETER_MISMATCH: declared planner params disagree with the "
++                f"controller's own telemetry. left_match={self._planner_param_match_left} "
++                f"right_match={self._planner_param_match_right}. "
++                f"master telemetry K={lt.stiffness_n_per_m} D={lt.damping_n_s_per_m} "
++                f"Fmax={lt.max_force_n} errmax={lt.max_position_error_m} vs declared "
++                f"K={self.args.master_stiffness_n_per_m} D={self.args.master_damping_n_s_per_m} "
++                f"Fmax={self.args.master_max_force_n} errmax={self.args.master_max_position_error_m}; "
++                f"slave telemetry K={rt.stiffness_n_per_m} D={rt.damping_n_s_per_m} "
++                f"Fmax={rt.max_force_n} errmax={rt.max_position_error_m} vs declared "
++                f"K={self.args.stiffness_n_per_m} D={self.args.slave_damping_n_s_per_m} "
++                f"Fmax={self.args.slave_max_force_n} errmax={self.args.slave_max_position_error_m} "
++                f"-- forcing FAULT")
++            self.alignment.trigger_fault("COUPLING_RAMP_PARAMETER_MISMATCH")
++            return
++
++        master_arm = ArmState(
++            live_pose=list(lt.position_m), velocity=list(lt.velocity_mps),
++            full_target=master_full_target, stiffness_n_per_m=lt.stiffness_n_per_m,
++            damping_n_s_per_m=lt.damping_n_s_per_m, aux_vec=left_aux,
++            max_force_n=lt.max_force_n, max_position_error_m=lt.max_position_error_m,
++        )
++        slave_arm = ArmState(
++            live_pose=list(rt.position_m), velocity=list(rt.velocity_mps),
++            full_target=slave_full_target, stiffness_n_per_m=rt.stiffness_n_per_m,
++            damping_n_s_per_m=rt.damping_n_s_per_m, aux_vec=right_aux,
++            max_force_n=rt.max_force_n, max_position_error_m=rt.max_position_error_m,
++        )
++        try:
++            accepted_alpha = self._coupling_ramp.step_bilateral(now=now, dt=1.0 / self.args.rate_hz,
++                                                                 master=master_arm, slave=slave_arm)
++        except CouplingRampStalled as e:
++            self.get_logger().error(f"{e} -- forcing FAULT")
++            self.alignment.trigger_fault("COUPLING_RAMP_STALLED_FORCE_BUDGET")
++            return
++        self.alignment.set_coupling_alpha(accepted_alpha)
++
+     def _update_c2(self) -> None:
+         """C2: slave position -> master target, the reverse direction of C3.
+ 
+@@ -624,27 +999,30 @@ class MasterSlaveBridge(Node):
+         """
+         if self.latest_right is None or self.alignment.right_anchor is None or self.alignment.left_anchor is None:
+             return
++        # Diagnostic only (BridgeDiagnostics' mapped_slave_relative_m), kept
++        # in the anchor-relative frame regardless of absolute_axes so it
++        # still reads as "how far from its own anchor is the slave", matching
++        # C3's own mapped_unclamped diagnostic convention. NOT the target --
++        # see compute_c2_target() for the actual (frame-correct) target.
+         slave_disp = [self.latest_right[i] - self.alignment.right_anchor[i] for i in range(3)]
+         unscaled = [
+             slave_disp[i] / self.axis_scale[i] if abs(self.axis_scale[i]) > 1e-9 else 0.0
+             for i in range(3)
+         ]
+-        master_disp = apply_axis_map_inverse(self.axis_map, unscaled)
+-        # Stored PRE-clamp, for BridgeDiagnostics' mapped_slave_relative_m --
+-        # the "what C2 is asking for" value, matching C3's own mapped_unclamped
+-        # convention in _tick().
+-        self._c2_mapped_slave_relative = list(master_disp)
+-        self._master_travel_limit_flag = False
+-        limit = float(self.args.left_max_offset_m)
+-        if limit > 0.0:
+-            for i in range(3):
+-                if master_disp[i] > limit:
+-                    master_disp[i] = limit
+-                    self._master_travel_limit_flag = True
+-                elif master_disp[i] < -limit:
+-                    master_disp[i] = -limit
+-                    self._master_travel_limit_flag = True
+-        left_target = [self.alignment.left_anchor[i] + master_disp[i] for i in range(3)]
++        self._c2_mapped_slave_relative = apply_axis_map_inverse(self.axis_map, unscaled)
++
++        left_target, self._master_travel_limit_flag = compute_c2_target(
++            self.latest_right, self.alignment.right_anchor, self.alignment.left_anchor,
++            self.axis_map, self.axis_scale, float(self.args.left_max_offset_m),
++            absolute_axes=self.absolute_axes, absolute_trim=self.absolute_trim,
++        )
++        # Same arm_teleop gate as C3's blend_target() (see _tick()'s matching
++        # comment) -- before this, left_target was published unconditionally
++        # regardless of READY/RAMPING/ACTIVE state, so the master rendered
++        # real force even while unarmed (found 2026-09-09, see
++        # blend_left_target()'s docstring in startup_alignment.py).
++        left_target = self.alignment.blend_left_target(left_target)
++
+         self.last_left_target = left_target
+         self._publish_left_target(left_target)
+ 
+@@ -868,29 +1246,42 @@ class MasterSlaveBridge(Node):
+         return [self.last_target[i] + move[i] * shrink for i in range(3)]
+ 
+     def _publish_gravity_comp(self) -> None:
+-        """Constant upward bias, republished every tick so it cannot go stale."""
++        """Upward bias, republished every tick so it cannot go stale. Scaled
++        by ramp_alpha (added 2026-09-09, arm/disarm force-contract task):
++        this used to be a constant regardless of arm state, so the slave
++        carried the full configured bias even in READY/unarmed -- meaning
++        two different SLAVE_GRAVITY_COMP_N configurations (e.g. the planned
++        A2=0.55 vs B3=0.70 comparison) were already physically distinct
++        BEFORE arming, violating the same "arm=false must be a single,
++        configuration-independent safe state" contract the C2 position fix
++        established. ramp_alpha is 0 in READY, 0->1 across RAMPING, and 1 in
++        ACTIVE/immediately after a fresh arm -- same ramp already used for
++        the C2/C3 targets, not a new one."""
+         if self.slave_force_pub is None:
+             return
+         msg = WrenchStamped()
+         msg.header.stamp = self.get_clock().now().to_msg()
+         msg.header.frame_id = self.args.slave_frame
+         force = [0.0, 0.0, 0.0]
+-        force[self.args.slave_gravity_axis] = float(self.args.slave_gravity_comp_n)
++        force[self.args.slave_gravity_axis] = ramped_gravity_comp_n(
++            float(self.args.slave_gravity_comp_n), self.alignment.gravity_ramp_alpha)
+         msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z = force
+         self.slave_force_pub.publish(msg)
+ 
+     def _publish_left_gravity_comp(self) -> None:
+         """Master-side counterpart to _publish_gravity_comp(), for C2. Same
+-        mechanism, same reasoning: a constant bias on the master's own
+-        force_cmd, so C2's spring is not spending its whole budget holding
+-        the master's own weight up before it can track the slave."""
++        mechanism, same reasoning: a bias on the master's own force_cmd, so
++        C2's spring is not spending its whole budget holding the master's
++        own weight up before it can track the slave. Same ramp_alpha scaling
++        as _publish_gravity_comp() -- see that method's docstring."""
+         if self.left_force_pub is None:
+             return
+         msg = WrenchStamped()
+         msg.header.stamp = self.get_clock().now().to_msg()
+         msg.header.frame_id = self.args.master_frame
+         force = [0.0, 0.0, 0.0]
+-        force[self.args.left_gravity_axis] = float(self.args.left_gravity_comp_n)
++        force[self.args.left_gravity_axis] = ramped_gravity_comp_n(
++            float(self.args.left_gravity_comp_n), self.alignment.gravity_ramp_alpha)
+         msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z = force
+         self.left_force_pub.publish(msg)
+ 
+@@ -965,6 +1356,40 @@ def parse_args() -> argparse.Namespace:
+     parser.add_argument("--left-pose-topic", default="/touch_left/pose")
+     parser.add_argument("--left-buttons-topic", default="/touch_left/buttons")
+     parser.add_argument("--right-pose-topic", default="/touch_right/pose")
++    parser.add_argument("--left-telemetry-topic", default="/touch_left/cartesian_controller_telemetry")
++    parser.add_argument("--right-telemetry-topic", default="/touch_right/cartesian_controller_telemetry")
++    fb = parser.add_argument_group(
++        "force-budget-aware coupling ramp (2026-09-09)",
++        "See coupling_force_budget.py's module docstring for the full "
++        "root-cause rationale and controller-predictor audit. These are "
++        "the planner's OWN belief about each arm's controller parameters "
++        "-- the bridge cannot query touch_slave.cpp/touch_slave_sim's "
++        "actual configured values at runtime, so a mismatch between these "
++        "and what the controller node was ACTUALLY launched with is a "
++        "real, silent risk (Part 5's 'parameter source audit' -- not "
++        "closed, only made visible: published in /bridge_diagnostics).")
++    fb.add_argument("--master-stiffness-n-per-m", type=float, default=15.0,
++                    help="must match run_master_left.sh's actual stiffness_n_per_m")
++    fb.add_argument("--master-damping-n-s-per-m", type=float, default=0.10,
++                    help="must match run_master_left.sh's actual damping_n_s_per_m")
++    fb.add_argument("--master-max-force-n", type=float, default=2.0,
++                    help="must match run_master_left.sh's actual MAX_FORCE_N")
++    fb.add_argument("--master-max-position-error-m", type=float, default=0.03,
++                    help="must match touch_slave.cpp's actual max_position_error_m for the master")
++    fb.add_argument("--slave-damping-n-s-per-m", type=float, default=0.20,
++                    help="must match run_slave_right.sh's actual DAMPING_N_S_PER_M")
++    fb.add_argument("--slave-max-force-n", type=float, default=1.5,
++                    help="must match run_slave_right.sh's actual MAX_FORCE_N")
++    fb.add_argument("--slave-max-position-error-m", type=float, default=0.04,
++                    help="must match touch_slave.cpp's actual max_position_error_m for the slave")
++    fb.add_argument("--force-budget-reserve-n", type=float, default=0.10,
++                    help="safety margin below max_force_n the planner targets -- experimental, "
++                         "not asserted optimal")
++    fb.add_argument("--force-budget-telemetry-stale-s", type=float, default=0.2,
++                    help="if either arm's cartesian_controller_telemetry is older than this "
++                         "during COUPLING_RAMP_UP, coupling alpha HOLDS rather than using an "
++                         "untrusted velocity estimate (Part 1's explicit requirement)")
++    fb.add_argument("--force-budget-stall-timeout-s", type=float, default=3.0)
+     align = parser.add_argument_group(
+         "startup alignment (2026-09-08 Phase 1)",
+         "See startup_alignment.py for the full state machine and the "
+diff --git a/projects/teleop_left_master_right_slave/scripts/run_master_left.sh b/projects/teleop_left_master_right_slave/scripts/run_master_left.sh
+index 47cf9a3..52ed557 100755
+--- a/projects/teleop_left_master_right_slave/scripts/run_master_left.sh
++++ b/projects/teleop_left_master_right_slave/scripts/run_master_left.sh
+@@ -33,6 +33,11 @@ PUBLISH_TELEMETRY="${PUBLISH_TELEMETRY:-true}"
+ # a position-tracking slave, and MAX_FORCE_N above is already the harder
+ # ceiling. Only takes effect when ENABLE_C2=true; with it false (the
+ # default), this script's node params are byte-identical to before C2 existed.
++# TO_BE_OPTIMIZED: all four values below are current BASELINE values, not
++# scientifically validated optima -- already configurable (this env-var
++# override IS the configuration mechanism Scientific design process Phase 5
++# needs), no numeric change made here. See
++# docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md's C2 entry.
+ ENABLE_C2="${ENABLE_C2:-false}"
+ LEFT_STIFFNESS_N_PER_M="${LEFT_STIFFNESS_N_PER_M:-15.0}"
+ LEFT_DAMPING_N_S_PER_M="${LEFT_DAMPING_N_S_PER_M:-0.10}"
+diff --git a/projects/teleop_left_master_right_slave/scripts/run_slave_right.sh b/projects/teleop_left_master_right_slave/scripts/run_slave_right.sh
+index ec4d202..ff3209a 100755
+--- a/projects/teleop_left_master_right_slave/scripts/run_slave_right.sh
++++ b/projects/teleop_left_master_right_slave/scripts/run_slave_right.sh
+@@ -17,6 +17,9 @@ REPO_ROOT="$(cd "${PROJECT_ROOT}/../.." && pwd)"
+ TOUCH_WS="${TOUCH_WS:-${REPO_ROOT}/ros2_ws}"
+ ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
+ PUBLISH_HZ="${PUBLISH_HZ:-200}"
++# TO_BE_OPTIMIZED (C3): current BASELINE values, not scientifically
++# validated optima -- already configurable via these env vars, no numeric
++# change made here. See docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md.
+ MAX_FORCE_N="${MAX_FORCE_N:-1.5}"
+ STIFFNESS_N_PER_M="${STIFFNESS_N_PER_M:-35.0}"
+ DAMPING_N_S_PER_M="${DAMPING_N_S_PER_M:-0.20}"
+diff --git a/projects/teleop_left_master_right_slave/scripts/startup_alignment.py b/projects/teleop_left_master_right_slave/scripts/startup_alignment.py
+index 41561a9..3f3b38e 100644
+--- a/projects/teleop_left_master_right_slave/scripts/startup_alignment.py
++++ b/projects/teleop_left_master_right_slave/scripts/startup_alignment.py
+@@ -1,6 +1,6 @@
+ """Deterministic startup/alignment state machine for the master<->slave
+-Cartesian teleop bridge (2026-09-08, Phase 1 of the diagnose-and-repair
+-task).
++Cartesian teleop bridge (2026-09-08 Phase 1; staged arm/disarm transition
++added 2026-09-09 after a real-hardware root-cause investigation, see below).
+ 
+ WHAT THIS DOES NOT DO, stated up front per the task's own correction to
+ its initial framing: it does NOT change the control law. bridge_master_
+@@ -14,7 +14,9 @@ right_anchor -- any constant shift in either anchor is exactly cancelled
+ by the subtraction/addition around it. This module does not touch that
+ formula. What it adds is making the CAPTURE of those two anchors
+ deterministic, validated, and safely armed, instead of "whichever pose
+-message happens to arrive first."
++message happens to arrive first," and (as of 2026-09-09) staging HOW
++authority is handed to that formula so that gravity compensation and
++bilateral position coupling are never ramped simultaneously.
+ 
+ GEOMETRIC MEANING OF right_minus_mapped_left, worked out precisely because
+ the task explicitly warns against a threshold chosen without understanding
+@@ -42,26 +44,61 @@ generous sanity bound (catches (b)) rather than trying to drive this
+ value to exactly zero (which would be gating on something the control law
+ never actually required).
+ 
+-STATE MACHINE
++STATE MACHINE (rewritten 2026-09-09, staged arm/disarm)
+     WAIT_FOR_POSES -> HOLD_STILL -> CAPTURE_ANCHORS -> VALIDATE_ALIGNMENT
+-        -> READY -> RAMPING -> ACTIVE
++        -> READY
++    ARM:
++        READY -> GRAVITY_RAMP_UP -> GRAVITY_SETTLE -> COUPLING_RAMP_UP -> ACTIVE
++    DISARM:
++        ACTIVE -> COUPLING_RAMP_DOWN -> GRAVITY_RAMP_DOWN -> READY
+     Any state -> FAULT (stale pose, excessive motion during hold,
+         impossible/oversized alignment error). FAULT requires an explicit
+         reset() -- no auto-recovery, per the task's explicit requirement.
++        FAULT is an IMMEDIATE force-safe transition -- gravity_ramp_alpha
++        and coupling_ramp_alpha both snap to 0 in the same tick, unlike a
++        NORMAL disarm which stages down deliberately (see _fault() and
++        Part 4 of the 2026-09-09 staged-transition task).
++
++WHY STAGED (2026-09-09 root-cause investigation): the previous single-stage
++RAMPING blended gravity 0->G and bilateral coupling own-pose->target
++SIMULTANEOUSLY over one ramp_duration_s. On real hardware this let the
++slave's C3 target sweep ~117mm (its own gravity-sagged rest pose -> the
++master's held position) while gravity compensation was ALSO still ramping
++in, meaning the arm was being asked to travel a large distance while not
++yet fully weight-supported -- producing large (30-47mm) tracking error and
++driving the slave's force to its 1.5N ceiling (primary_force_clamped).
++Symmetrically, on disarm, gravity vanished at the same instant coupling
++did, so the arm's own gravity sag immediately competed with the bridge's
++target-follows-own-live-pose logic through a 100Hz-target/200Hz-controller
++sample-and-hold gap, producing a real but bounded post-disarm spring-force
++transient (~0.2N). Neither was a code bug (see test_ramp_disarm_root_cause.py
++and this session's real-hardware CSV analysis) -- both were the physical/
++scheduling consequence of doing two different physical processes (weight
++support, position coupling) at once. Staging them (gravity fully settles
++BEFORE coupling engages; coupling fully backs off BEFORE gravity is
++removed) removes the interaction, not just masks its symptom.
+ 
+ INTEGRATION: bridge_master_slave.py feeds this module pose samples via
+ update_master_pose()/update_slave_pose() (called from its existing
+ _left_cb/_right_cb) and drives it forward via tick() (called once per
+-_tick()). It then reads .state, .left_anchor, .right_anchor, .ramp_alpha,
+-.ready, and .diagnostics() -- the bridge's own target-computation math is
+-unchanged except for (1) using this module's anchors instead of its own
+-inline "first message wins" capture, and (2) blending the FINAL computed
+-target toward right_anchor by ramp_alpha, which is the "safest
+-mathematically consistent location" to apply the ramp: it never touches
+-stiffness/damping/DOB, only the commanded setpoint the existing spring
+-already tracks, so at alpha=0 the slave is asked to do nothing (hold its
+-own anchor) and at alpha=1 behavior is byte-for-byte the pre-existing
+-formula.
++_tick()). It then reads .state, .left_anchor, .right_anchor,
++.gravity_ramp_alpha, .coupling_ramp_alpha, .ramp_alpha (legacy alias, see
++below), .ready, and .diagnostics(). Gravity commands use
++.gravity_ramp_alpha (via ramped_gravity_comp_n() in bridge_master_slave.py);
++C2/C3 targets are blended via blend_target()/blend_left_target(), which now
++use .coupling_ramp_alpha exclusively -- gravity_ramp_alpha never enters the
++position-target formula, and coupling_ramp_alpha never enters the gravity
++formula, per Part 1's explicit "do not overload one ramp_alpha for
++unrelated physical processes" requirement.
++
++`ramp_alpha` is kept as a backward-compatible ALIAS, always exactly equal
++to `coupling_ramp_alpha`: this is the one unambiguous meaning that survives
++the split, because .state only ever equals ACTIVE once BOTH gravity_ramp_
++alpha==1.0 AND coupling_ramp_alpha==1.0 (gravity always finishes ramping
++before coupling starts), so external code that already gates on
++`state=="ACTIVE" and ramp_alpha>=0.999` (e.g. the scientific recorder's
++is_confirmed_active()) continues to work unchanged and continues to mean
++exactly what it always meant: "bilateral coupling is fully engaged."
+ """
+ from __future__ import annotations
+ 
+@@ -69,6 +106,21 @@ import time
+ from dataclasses import dataclass, field
+ from typing import Dict, List, Optional, Tuple
+ 
++# 2026-09-09 Part 2 (validation-infrastructure follow-up) explicit labeling:
++# this threshold was derived from SIM quiet-state telemetry noise floor
++# (investigate_quiet_state_noise_floor.py: master max ~1.85mm/s, slave max
++# ~1.08mm/s, both under the sim's own touch_slave_sim controller/estimator
++# pipeline). It is NOT validated against real hardware -- the real Touch/
++# Phantom Omni devices' own velocity estimation noise floor is unmeasured
++# and may differ substantially (different encoder resolution, different
++# differentiation/filtering in the real HD API vs the sim's estimator).
++# Frozen at this sim-derived value for THIS validation task; a separate
++# quiet-state measurement from the real devices is required before this
++# gate can be trusted on real hardware -- see the torque-sensing/hardware-
++# interaction-hold project memories for the standing "no real hardware in
++# this task" constraint this also respects.
++SIM_GRAVITY_SETTLE_VELOCITY_THRESHOLD_MPS = 0.005
++
+ # ---------------------------------------------------------------------------
+ # States
+ # ---------------------------------------------------------------------------
+@@ -77,12 +129,22 @@ HOLD_STILL = "HOLD_STILL"
+ CAPTURE_ANCHORS = "CAPTURE_ANCHORS"
+ VALIDATE_ALIGNMENT = "VALIDATE_ALIGNMENT"
+ READY = "READY"
+-RAMPING = "RAMPING"
++GRAVITY_RAMP_UP = "GRAVITY_RAMP_UP"
++GRAVITY_SETTLE = "GRAVITY_SETTLE"
++COUPLING_RAMP_UP = "COUPLING_RAMP_UP"
+ ACTIVE = "ACTIVE"
++COUPLING_RAMP_DOWN = "COUPLING_RAMP_DOWN"
++GRAVITY_RAMP_DOWN = "GRAVITY_RAMP_DOWN"
+ FAULT = "FAULT"
+ 
++# Legacy alias: some callers/tests still reference RAMPING as "any state
++# where authority is transitioning." Not a real state -- see _ALL_RAMP_STATES.
++_ALL_RAMP_STATES = (GRAVITY_RAMP_UP, GRAVITY_SETTLE, COUPLING_RAMP_UP,
++                    COUPLING_RAMP_DOWN, GRAVITY_RAMP_DOWN)
++
+ _ALL_STATES = (WAIT_FOR_POSES, HOLD_STILL, CAPTURE_ANCHORS, VALIDATE_ALIGNMENT,
+-              READY, RAMPING, ACTIVE, FAULT)
++              READY, GRAVITY_RAMP_UP, GRAVITY_SETTLE, COUPLING_RAMP_UP, ACTIVE,
++              COUPLING_RAMP_DOWN, GRAVITY_RAMP_DOWN, FAULT)
+ 
+ 
+ @dataclass
+@@ -112,11 +174,105 @@ class AlignmentConfig:
+     # radius, not a few cm.
+     max_alignment_error_m: float = 0.15
+ 
+-    # RAMPING: commanded target blends from right_anchor (zero relative
+-    # motion) to the full mapped target over this duration. 1.0s per the
+-    # task's own default.
++    # COUPLING_RAMP_UP: commanded target blends from own-live-pose (zero
++    # relative motion) to the full C2/C3 target over this duration. 1.0s,
++    # unchanged from the pre-staging default (this is the SAME quantity the
++    # old single-stage RAMPING used, kept under its original name/CLI flag
++    # for backward compatibility -- see bridge_master_slave.py's
++    # --alignment-ramp-s).
+     ramp_duration_s: float = 1.0
+ 
++    # GRAVITY_RAMP_UP: gravity compensation ramps 0->configured over this
++    # duration BEFORE any bilateral coupling begins -- see the module
++    # docstring's root-cause rationale. Deliberately shorter than the
++    # coupling ramp: gravity is a single scalar bias per axis, not a
++    # potentially-large position sweep, so it does not need as much time.
++    gravity_ramp_duration_s: float = 0.3
++
++    # GRAVITY_SETTLE (2026-09-09, REVISED after a real-hardware/live-sim
++    # finding: the original fixed gravity_settle_duration_s=0.2s snapshotted
++    # the COUPLING_RAMP_UP origin mid-transient -- measured slave vy was
++    # STILL INCREASING (+0.032 -> +0.122 m/s) at the end of that 0.2s window,
++    # nowhere near settled. A fixed clock cannot know how long the real
++    # plant's step response to newly-applied gravity actually takes, so this
++    # is now a STATE-BASED gate: advance to COUPLING_RAMP_UP only once
++    # ||velocity_mps|| for BOTH arms has stayed under a noise-floor-derived
++    # threshold continuously for gravity_settle_hold_s, with a minimum time
++    # floor and a maximum timeout (see investigate_gravity_settle_timing.py
++    # and investigate_quiet_state_noise_floor.py for the measurements this
++    # was derived from).
++    #
++    # Threshold derivation (investigate_quiet_state_noise_floor.py, 2026-09-09):
++    # measured quiet-state (mechanically-at-rest) velocity_mps norm noise
++    # floor over an 801-sample/2.0s window, post the fixture's own 3.0s
++    # native-physics settle:
++    #   master (pinned by the sim's stiff Hand): mean=0.578 rms=0.830
++    #       p95=1.845 max=1.852 mm/s
++    #   slave  (native-gravity settle, no bridge control active): mean=1.027
++    #       rms=1.028 p95=1.075 max=1.081 mm/s
++    # Both arms' observed noise ceiling sits under 2mm/s. 5mm/s gives
++    # >2.7x margin over master's max and >4.6x over slave's max, so ordinary
++    # sensor/estimator noise at rest never falsely reads as "still moving",
++    # while remaining two orders of magnitude below the genuine transient
++    # velocities observed during an actual gravity-settle overshoot
++    # (order 100-150mm/s in the 117mm live run that motivated this change).
++    #
++    # 2026-09-09 Part 2 explicit labeling: this is SIM_GRAVITY_SETTLE_
++    # VELOCITY_THRESHOLD_MPS (see the module-level constant of that name) --
++    # a SIM-derived value, NOT validated against real hardware. Do not treat
++    # this default as applicable to a real-hardware run without a separate
++    # quiet-state noise-floor measurement from the real devices first.
++    gravity_settle_velocity_threshold_mps: float = SIM_GRAVITY_SETTLE_VELOCITY_THRESHOLD_MPS
++
++    # Velocity must stay under the threshold CONTINUOUSLY for this long
++    # before GRAVITY_SETTLE is considered complete -- rejects a single lucky
++    # noise dip through zero mid-oscillation from being mistaken for having
++    # actually settled. ~0.15s covers many samples at this project's typical
++    # 100-200Hz telemetry/tick rates.
++    gravity_settle_hold_s: float = 0.15
++
++    # Minimum time GRAVITY_SETTLE must remain active even if velocity reads
++    # quiet immediately -- guards against a single fortunate quiet tick right
++    # as GRAVITY_RAMP_UP completes (before any real transient has even had a
++    # chance to develop) short-circuiting the gate.
++    gravity_settle_min_time_s: float = 0.1
++
++    # Backstop: if the plant has not satisfied the quiet-hold condition
++    # within this long, GRAVITY_SETTLE_TIMEOUT faults (immediate force-safe)
++    # rather than snapshotting a mid-transient origin -- the real 117mm live
++    # run showed velocity still large (no decay below the noise floor) after
++    # 3.3s of continuous observation, so 10s gives real margin above that
++    # while still being a bounded, reportable failure rather than an
++    # unbounded hang.
++    gravity_settle_timeout_s: float = 10.0
++
++    # Legacy name, kept ONLY as the attribute existing callers/tests may
++    # still reference for the old fixed-duration behavior's approximate
++    # scale -- NOT read by tick() any more (see GRAVITY_SETTLE's velocity-
++    # gated logic above). Retained rather than deleted so an old test that
++    # merely constructs AlignmentConfig(gravity_settle_duration_s=...) does
++    # not hard-error; it simply has no effect.
++    gravity_settle_duration_s: float = 0.2
++
++    # COUPLING_RAMP_DOWN: symmetric to COUPLING_RAMP_UP, coupling 1->0 with
++    # gravity held constant. Same duration by default (a symmetric ramp is
++    # the conservative choice absent evidence either direction needs to
++    # move faster/slower).
++    coupling_ramp_down_duration_s: float = 1.0
++
++    # SELF_FOLLOW settle window between coupling reaching 0 and gravity
++    # beginning to ramp down -- lets the "own target follows own live pose,
++    # spring force near zero" state (Part 3's SELF_FOLLOW_CONFIRMED) actually
++    # be confirmed by elapsed time before gravity is touched, rather than
++    # removing gravity in the very same tick coupling reaches zero.
++    self_follow_settle_duration_s: float = 0.2
++
++    # GRAVITY_RAMP_DOWN: gravity ramps configured->0 over this duration,
++    # ONLY after coupling has already reached zero and settled -- this is
++    # what removes the disarm-side interaction the root-cause investigation
++    # found (gravity disappearing while coupling was still live/just-removed).
++    gravity_ramp_down_duration_s: float = 0.3
++
+ 
+ @dataclass
+ class _PoseSample:
+@@ -142,6 +298,27 @@ class TeleopStartupAlignment:
+ 
+         self._latest_master: Optional[_PoseSample] = None
+         self._latest_slave: Optional[_PoseSample] = None
++        # 2026-09-09 GRAVITY_SETTLE revision: velocity is optional input
++        # (None until update_master_velocity/update_slave_velocity is
++        # called at least once) -- None is treated as "not known quiet",
++        # never as "assumed zero", so a caller that forgets to wire velocity
++        # in cannot accidentally short-circuit the settle gate.
++        self._latest_master_vel: Optional[List[float]] = None
++        self._latest_slave_vel: Optional[List[float]] = None
++        # Tracks the start time of the CURRENT unbroken run of "both arms
++        # under the velocity threshold" -- None means not currently quiet.
++        self._quiet_since_t: Optional[float] = None
++        # 2026-09-09 Part 3 observability (see GRAVITY_SETTLE's tick() branch
++        # for how these are populated).
++        self._quiet_window_master_pos0: Optional[List[float]] = None
++        self._quiet_window_slave_pos0: Optional[List[float]] = None
++        self.master_settle_velocity_norm_mps: Optional[float] = None
++        self.slave_settle_velocity_norm_mps: Optional[float] = None
++        self.master_settle_pose_drift_m: Optional[float] = None
++        self.slave_settle_pose_drift_m: Optional[float] = None
++        self.settle_quiet_window_accumulated_s: float = 0.0
++        self.last_accepted_settle_master_pose_drift_m: Optional[float] = None
++        self.last_accepted_settle_slave_pose_drift_m: Optional[float] = None
+ 
+         self._hold_window_start: Optional[float] = None
+         self._hold_master_samples: List[_PoseSample] = []
+@@ -163,8 +340,27 @@ class TeleopStartupAlignment:
+         self.initial_alignment_error_norm: Optional[float] = None
+ 
+         self._armed_requested = False
+-        self._ramp_start_t: Optional[float] = None
+-        self.ramp_alpha: float = 0.0
++        self._disarmed_requested = False
++
++        # Two independent ramp scalars (2026-09-09 staged-transition
++        # rewrite) -- see the module docstring for why these are kept
++        # separate rather than one overloaded ramp_alpha.
++        self.gravity_ramp_alpha: float = 0.0
++        self.coupling_ramp_alpha: float = 0.0
++        self._phase_start_t: Optional[float] = None
++        # The alpha value coupling/gravity ramps started FROM this phase
++        # (usually 0.0 or 1.0, but can be partial if disarm/re-arm interrupts
++        # a ramp already in progress -- see _ramp_value()).
++        self._phase_start_alpha: float = 0.0
++
++        # 2026-09-09 production-integration task: when True, tick()'s
++        # COUPLING_RAMP_UP branch does not compute coupling_ramp_alpha
++        # itself -- the caller (bridge_master_slave.py, which owns an
++        # AdaptiveCouplingRamp with real controller telemetry) drives it via
++        # set_coupling_alpha() before each tick() call. False (default)
++        # preserves the original fixed-time behavior unchanged, so every
++        # existing caller/test that never touches this flag is unaffected.
++        self.external_coupling_alpha_control: bool = False
+ 
+         self._transitions: List[Tuple[float, str, str]] = []  # (t, from, to)
+ 
+@@ -176,6 +372,20 @@ class TeleopStartupAlignment:
+     def update_slave_pose(self, pos: List[float], t: Optional[float] = None) -> None:
+         self._latest_slave = _PoseSample(t if t is not None else self._now(), list(pos))
+ 
++    def update_master_velocity(self, vel: List[float]) -> None:
++        """2026-09-09 GRAVITY_SETTLE revision: velocity_mps from the
++        controller's own telemetry (the same quantity HD_CURRENT_VELOCITY-
++        derived and already used by coupling_force_budget.py's predictor),
++        fed in by the caller so this module can gate GRAVITY_SETTLE on
++        actual mechanical quiescence rather than a fixed clock. Optional --
++        a caller that never calls this simply never satisfies the quiet
++        condition and relies on gravity_settle_timeout_s (see GRAVITY_SETTLE
++        below), rather than silently mis-measuring zero velocity."""
++        self._latest_master_vel = list(vel)
++
++    def update_slave_velocity(self, vel: List[float]) -> None:
++        self._latest_slave_vel = list(vel)
++
+     def update_master_q(self, q: List[float]) -> None:
+         self._latest_master_q = list(q)
+ 
+@@ -189,6 +399,45 @@ class TeleopStartupAlignment:
+         actually applies to."""
+         self._armed_requested = True
+ 
++    def disarm(self) -> None:
++        """Operator-explicit NORMAL disarm request -- staged coupling-down
++        then gravity-down (see the module docstring's DISARM sequence and
++        Part 4's explicit NORMAL-vs-EMERGENCY distinction: this is the
++        graceful path, not the immediate-force-safe FAULT path). Only sets a
++        flag, exactly like arm() -- tick() (the ONLY place state actually
++        transitions) interprets it per-state below, so an external call can
++        never mutate state outside the tick cycle or race a
++        staleness/FAULT check. Takes effect from ACTIVE, or from anywhere in
++        the arm sequence (GRAVITY_RAMP_UP/GRAVITY_SETTLE/COUPLING_RAMP_UP) --
++        disarming mid-arm gracefully unwinds whatever has already been
++        engaged rather than first completing the arm sequence. No-op from
++        READY or already-disarming states (tick() simply never checks the
++        flag there)."""
++        self._disarmed_requested = True
++
++    def set_coupling_alpha(self, value: float) -> None:
++        """External-planner entrypoint (2026-09-09 production-integration
++        task): the caller sets this to the force-budget-accepted alpha for
++        the CURRENT tick, before calling tick() -- only takes effect while
++        external_coupling_alpha_control is True and state is
++        COUPLING_RAMP_UP (silently ignored otherwise, matching arm()/
++        disarm()'s own "no-op outside the state it applies to" convention,
++        so a stray call from the wrong phase cannot corrupt state). Enforces
++        monotonic non-decrease here too, as defense in depth against a
++        buggy caller -- coupling_force_budget.py's own AdaptiveCouplingRamp
++        already guarantees this, but this is the single authoritative
++        coupling_ramp_alpha value in the whole system (Part 4's explicit
++        'there must be exactly one authoritative coupling_ramp_alpha'
++        requirement), so it re-asserts the invariant rather than trusting
++        the caller silently."""
++        if not self.external_coupling_alpha_control or self.state != COUPLING_RAMP_UP:
++            return
++        assert value >= self.coupling_ramp_alpha - 1e-9, (
++            f"coupling_ramp_alpha must be monotonically non-decreasing, "
++            f"got {value} after {self.coupling_ramp_alpha}")
++        self.coupling_ramp_alpha = min(1.0, max(self.coupling_ramp_alpha, value))
++        self._armed_requested = False
++
+     def reset(self) -> None:
+         """Explicit re-arm after FAULT. No auto-recovery -- the task's own
+         requirement -- so this must be called deliberately (e.g. a ROS
+@@ -206,8 +455,21 @@ class TeleopStartupAlignment:
+         self.initial_alignment_error_xyz = None
+         self.initial_alignment_error_norm = None
+         self._armed_requested = False
+-        self._ramp_start_t = None
+-        self.ramp_alpha = 0.0
++        self._disarmed_requested = False
++        self.gravity_ramp_alpha = 0.0
++        self.coupling_ramp_alpha = 0.0
++        self._phase_start_t = None
++        self._phase_start_alpha = 0.0
++        self._quiet_since_t = None
++        self._quiet_window_master_pos0 = None
++        self._quiet_window_slave_pos0 = None
++        self.master_settle_velocity_norm_mps = None
++        self.slave_settle_velocity_norm_mps = None
++        self.master_settle_pose_drift_m = None
++        self.slave_settle_pose_drift_m = None
++        self.settle_quiet_window_accumulated_s = 0.0
++        self.last_accepted_settle_master_pose_drift_m = None
++        self.last_accepted_settle_slave_pose_drift_m = None
+ 
+     # ---- mapping, supplied by the caller (bridge owns axis_map/scale) -----
+ 
+@@ -225,14 +487,73 @@ class TeleopStartupAlignment:
+         self._transitions.append((self._now(), self.state, new_state))
+         self.state = new_state
+ 
++    def _begin_phase(self, new_state: str) -> None:
++        """Enter a ramp phase, recording the CURRENT alpha (gravity's or
++        coupling's, whichever this phase drives) as the ramp's starting
++        point -- so disarming mid-ramp-up reverses smoothly from wherever
++        authority actually is, not from an assumed 0 or 1 (Part 1's
++        "preserve existing hard safety behavior" plus ordinary continuity)."""
++        self._phase_start_t = self._now()
++        if new_state in (GRAVITY_RAMP_UP, GRAVITY_RAMP_DOWN):
++            self._phase_start_alpha = self.gravity_ramp_alpha
++        elif new_state in (COUPLING_RAMP_UP, COUPLING_RAMP_DOWN):
++            self._phase_start_alpha = self.coupling_ramp_alpha
++        if new_state == GRAVITY_SETTLE:
++            self._quiet_since_t = None
++            self._quiet_window_master_pos0 = None
++            self._quiet_window_slave_pos0 = None
++            self.master_settle_pose_drift_m = None
++            self.slave_settle_pose_drift_m = None
++            self.settle_quiet_window_accumulated_s = 0.0
++        self._transition(new_state)
++
+     def _fault(self, reason: str) -> None:
++        """IMMEDIATE force-safe transition (Part 4): unlike a normal disarm,
++        FAULT does not stage anything down -- both ramp scalars snap to 0 in
++        this same tick, so blend_target()/blend_left_target() and the
++        gravity command are already zero-coupling/zero-gravity on the very
++        next publish, regardless of what phase the arm/disarm sequence was
++        in when the fault occurred."""
+         self._fault_reason = reason
+         self._transition(FAULT)
+-        self.ramp_alpha = 0.0
++        self.gravity_ramp_alpha = 0.0
++        self.coupling_ramp_alpha = 0.0
++
++    def trigger_fault(self, reason: str) -> None:
++        """Public entrypoint for an EXTERNAL safety abort (2026-09-09
++        production-integration task) -- e.g. bridge_master_slave.py's force-
++        budget planner reporting COUPLING_RAMP_STALLED_FORCE_BUDGET or
++        COUPLING_RAMP_TELEMETRY_STALE. Identical semantics to the internal
++        _fault() path (immediate force-safe, no staged unwind) -- exposed
++        as a named public method rather than requiring callers to reach
++        into the private _fault()."""
++        self._fault(reason)
+ 
+     @property
+     def ready(self) -> bool:
+-        return self.state in (READY, RAMPING, ACTIVE)
++        return self.state in (READY, GRAVITY_RAMP_UP, GRAVITY_SETTLE, COUPLING_RAMP_UP,
++                              ACTIVE, COUPLING_RAMP_DOWN, GRAVITY_RAMP_DOWN)
++
++    @property
++    def ramp_alpha(self) -> float:
++        """Legacy backward-compatible alias -- see the module docstring's
++        explanation of why this equals coupling_ramp_alpha exactly and
++        remains unambiguous for existing callers gating on
++        state=="ACTIVE" and ramp_alpha>=0.999."""
++        return self.coupling_ramp_alpha
++
++    def _ramp_value(self, elapsed: float, duration: float, direction: int) -> float:
++        """direction=+1: ramps from self._phase_start_alpha toward 1.0.
++        direction=-1: ramps from self._phase_start_alpha toward 0.0.
++        Proportional to the FULL nominal duration, so resuming/reversing a
++        partially-completed ramp takes proportionally less time (a smooth,
++        bounded reversal, not a jump) -- exercised by
++        test_partial_ramp_reversal_is_smooth."""
++        span = 1.0 - self._phase_start_alpha if direction > 0 else self._phase_start_alpha
++        frac = min(1.0, max(0.0, elapsed / max(duration, 1e-6)))
++        if direction > 0:
++            return min(1.0, self._phase_start_alpha + frac * span)
++        return max(0.0, self._phase_start_alpha - frac * span)
+ 
+     def tick(self, mapper_fn) -> None:
+         """mapper_fn(pos_xyz) -> mapped_xyz: the bridge's own apply_axis_map
+@@ -313,35 +634,209 @@ class TeleopStartupAlignment:
+         if self.state == READY:
+             if self._armed_requested:
+                 self._armed_requested = False
+-                self._ramp_start_t = now
+-                self._transition(RAMPING)
++                self._begin_phase(GRAVITY_RAMP_UP)
++            return
++
++        # ---- ARM sequence: GRAVITY_RAMP_UP -> GRAVITY_SETTLE ->
++        #      COUPLING_RAMP_UP -> ACTIVE. Coupling stays exactly 0 through
++        #      both gravity phases (Part 2's critical invariant: "bilateral
++        #      position error must NOT generate spring demand during the
++        #      gravity-only phase" -- enforced structurally here, since
++        #      coupling_ramp_alpha is simply never touched by these branches). ----
++
++        if self.state == GRAVITY_RAMP_UP:
++            if self._disarmed_requested:
++                self._disarmed_requested = False
++                self._begin_phase(GRAVITY_RAMP_DOWN)
++                return
++            elapsed = now - self._phase_start_t
++            self.gravity_ramp_alpha = self._ramp_value(elapsed, self.cfg.gravity_ramp_duration_s, +1)
++            if self.gravity_ramp_alpha >= 1.0:
++                self._begin_phase(GRAVITY_SETTLE)
++            return
++
++        if self.state == GRAVITY_SETTLE:
++            if self._disarmed_requested:
++                self._disarmed_requested = False
++                self._begin_phase(GRAVITY_RAMP_DOWN)
++                return
++            self.gravity_ramp_alpha = 1.0
++
++            elapsed = now - self._phase_start_t
++            if elapsed >= self.cfg.gravity_settle_timeout_s:
++                self._fault(
++                    f"GRAVITY_SETTLE_TIMEOUT: mechanical settle not confirmed "
++                    f"(velocity under {self.cfg.gravity_settle_velocity_threshold_mps*1000:.1f}mm/s "
++                    f"held for {self.cfg.gravity_settle_hold_s:.2f}s) within "
++                    f"{self.cfg.gravity_settle_timeout_s:.1f}s"
++                )
++                return
++
++            quiet_now = False
++            self.master_settle_velocity_norm_mps = (
++                _norm3(self._latest_master_vel) if self._latest_master_vel is not None else None)
++            self.slave_settle_velocity_norm_mps = (
++                _norm3(self._latest_slave_vel) if self._latest_slave_vel is not None else None)
++            if self._latest_master_vel is not None and self._latest_slave_vel is not None:
++                m_speed = self.master_settle_velocity_norm_mps
++                s_speed = self.slave_settle_velocity_norm_mps
++                quiet_now = (m_speed < self.cfg.gravity_settle_velocity_threshold_mps
++                            and s_speed < self.cfg.gravity_settle_velocity_threshold_mps)
++
++            # 2026-09-09 Part 3 (validation-infrastructure follow-up)
++            # observability: track pose drift over the CURRENT quiet window
++            # (position now vs. position when this quiet window started) --
++            # purpose is to catch the velocity gate passing on a pathological
++            # oscillation zero-crossing (near-zero velocity for an instant
++            # while still moving through a large-amplitude swing), which a
++            # velocity-only check cannot distinguish from genuine rest.
++            if quiet_now:
++                if self._quiet_since_t is None:
++                    self._quiet_since_t = now
++                    self._quiet_window_master_pos0 = (
++                        list(self._latest_master.pos) if self._latest_master else None)
++                    self._quiet_window_slave_pos0 = (
++                        list(self._latest_slave.pos) if self._latest_slave else None)
++                    self.master_settle_pose_drift_m = 0.0
++                    self.slave_settle_pose_drift_m = 0.0
++                elif self._latest_master is not None and self._quiet_window_master_pos0 is not None:
++                    d = _norm3([self._latest_master.pos[i] - self._quiet_window_master_pos0[i]
++                               for i in range(3)])
++                    self.master_settle_pose_drift_m = max(self.master_settle_pose_drift_m or 0.0, d)
++                    if self._latest_slave is not None and self._quiet_window_slave_pos0 is not None:
++                        ds = _norm3([self._latest_slave.pos[i] - self._quiet_window_slave_pos0[i]
++                                    for i in range(3)])
++                        self.slave_settle_pose_drift_m = max(self.slave_settle_pose_drift_m or 0.0, ds)
++            else:
++                self._quiet_since_t = None
++                self._quiet_window_master_pos0 = None
++                self._quiet_window_slave_pos0 = None
++                self.master_settle_pose_drift_m = None
++                self.slave_settle_pose_drift_m = None
++
++            quiet_hold_satisfied = (
++                self._quiet_since_t is not None
++                and now - self._quiet_since_t >= self.cfg.gravity_settle_hold_s
++            )
++            min_time_satisfied = elapsed >= self.cfg.gravity_settle_min_time_s
++            self.settle_quiet_window_accumulated_s = (
++                (now - self._quiet_since_t) if self._quiet_since_t is not None else 0.0)
++
++            if quiet_hold_satisfied and min_time_satisfied:
++                # Report the FINAL ACCEPTED quiet window's max pose drift
++                # before _begin_phase() resets GRAVITY_SETTLE's own tracking
++                # state (see _begin_phase()'s "if new_state == GRAVITY_SETTLE"
++                # branch) -- this is the Part 3 "max pose drift during the
++                # final accepted quiet window" report value, frozen at the
++                # moment the gate passes rather than reset to None.
++                self.last_accepted_settle_master_pose_drift_m = self.master_settle_pose_drift_m
++                self.last_accepted_settle_slave_pose_drift_m = self.slave_settle_pose_drift_m
++                self._begin_phase(COUPLING_RAMP_UP)
+             return
+ 
+-        if self.state == RAMPING:
+-            elapsed = now - self._ramp_start_t
+-            self.ramp_alpha = min(1.0, max(0.0, elapsed / max(self.cfg.ramp_duration_s, 1e-6)))
+-            if self.ramp_alpha >= 1.0:
++        if self.state == COUPLING_RAMP_UP:
++            if self._disarmed_requested:
++                self._disarmed_requested = False
++                self._begin_phase(COUPLING_RAMP_DOWN)
++                return
++            if self.external_coupling_alpha_control:
++                # 2026-09-09 production-integration task: the caller (bridge_
++                # master_slave.py) owns an AdaptiveCouplingRamp and has
++                # ALREADY set self.coupling_ramp_alpha to the force-budget-
++                # accepted value for this tick, via set_coupling_alpha(),
++                # before calling tick() -- this module only watches for the
++                # completion condition, it does not compute the value itself
++                # while this flag is set (see set_coupling_alpha()'s own
++                # docstring for why this is the single authoritative value,
++                # not a second hidden path).
++                if self.coupling_ramp_alpha >= 1.0:
++                    self._transition(ACTIVE)
++                return
++            elapsed = now - self._phase_start_t
++            self.coupling_ramp_alpha = self._ramp_value(elapsed, self.cfg.ramp_duration_s, +1)
++            if self.coupling_ramp_alpha >= 1.0:
+                 self._transition(ACTIVE)
+             return
+ 
+         if self.state == ACTIVE:
+-            self.ramp_alpha = 1.0
++            self.gravity_ramp_alpha = 1.0
++            self.coupling_ramp_alpha = 1.0
++            if self._disarmed_requested:
++                self._disarmed_requested = False
++                self._begin_phase(COUPLING_RAMP_DOWN)
++            return
++
++        # ---- DISARM sequence: COUPLING_RAMP_DOWN -> GRAVITY_RAMP_DOWN ->
++        #      READY. Gravity stays at 1.0 through COUPLING_RAMP_DOWN and its
++        #      settle window -- this is what removes the disarm-side
++        #      interaction (see the module docstring). ----
++
++        if self.state == COUPLING_RAMP_DOWN:
++            elapsed = now - self._phase_start_t
++            self.coupling_ramp_alpha = self._ramp_value(elapsed, self.cfg.coupling_ramp_down_duration_s, -1)
++            if self.coupling_ramp_alpha <= 0.0:
++                self._begin_phase(GRAVITY_RAMP_DOWN)
++                # SELF_FOLLOW_CONFIRMED is represented as the first
++                # gravity_settle_duration_s-scale portion of GRAVITY_RAMP_DOWN
++                # rather than a separate state, to avoid a state whose only
++                # job is waiting -- diagnostics can distinguish it via
++                # self_follow_settle_elapsed() below if needed. See Part 1's
++                # "or an equivalent design if a smaller state representation
++                # is cleaner" allowance.
++                self._self_follow_settle_start_t = now
++            return
++
++        if self.state == GRAVITY_RAMP_DOWN:
++            self.coupling_ramp_alpha = 0.0
++            settle_elapsed = now - getattr(self, "_self_follow_settle_start_t", now)
++            if settle_elapsed < self.cfg.self_follow_settle_duration_s:
++                self.gravity_ramp_alpha = 1.0  # SELF_FOLLOW_CONFIRMED sub-phase: gravity still full
++                return
++            elapsed = now - self._phase_start_t - self.cfg.self_follow_settle_duration_s
++            self.gravity_ramp_alpha = self._ramp_value(
++                max(0.0, elapsed), self.cfg.gravity_ramp_down_duration_s, -1)
++            if self.gravity_ramp_alpha <= 0.0:
++                self._transition(READY)
+             return
+ 
+     # ---- output: blend the bridge's already-computed target -----------
+ 
+     def blend_target(self, full_target: List[float]) -> List[float]:
+-        """Applies the ramp in the "safest mathematically consistent
+-        location": the FINAL commanded setpoint, not the gains. At
+-        alpha=0 this returns right_anchor exactly (ask the slave to stay
+-        exactly where its anchor was captured -- zero relative motion,
+-        matching whatever it is already physically resting at, so there is
+-        no jump). At alpha=1 it returns full_target unchanged -- the
+-        pre-existing formula, byte for byte. Continuous in between."""
+-        if self.right_anchor is None:
++        """Blends the slave's target between its own live pose (zero
++        relative motion, zero-force-safe -- see the 2026-09-09 unarmed-
++        free-motion fix) and the full C2/C3-computed target, by
++        coupling_ramp_alpha ONLY -- gravity_ramp_alpha never enters this
++        formula (Part 1's explicit separation requirement).
++
++        Using the CONTINUOUSLY LIVE pose as the blend's zero-coupling
++        anchor (rather than a one-time snapshot captured at the start of
++        COUPLING_RAMP_UP) is a strictly stronger version of Part 2's "capture
++        fresh master and slave poses AGAIN at the start of this phase": at
++        alpha=0 this is ALWAYS exactly the live pose, at every tick, not just
++        the first one, so there is no way for a captured-but-then-stale
++        snapshot to exist -- see test_coupling_ramp_up_uses_continuously_live_origin.
++        At alpha=1 (ACTIVE) this is full_target unchanged, byte for byte,
++        the pre-existing formula, exactly as before staging was introduced."""
++        a = self.coupling_ramp_alpha
++        if self._latest_slave is not None:
++            live = self._latest_slave.pos
++        elif self.right_anchor is not None:
++            live = self.right_anchor
++        else:
++            return full_target
++        return [live[i] + a * (full_target[i] - live[i]) for i in range(3)]
++
++    def blend_left_target(self, full_target: List[float]) -> List[float]:
++        """C2's counterpart to blend_target() -- same coupling_ramp_alpha-only
++        blend, mirrored onto the master/left side."""
++        a = self.coupling_ramp_alpha
++        if self._latest_master is not None:
++            live = self._latest_master.pos
++        elif self.left_anchor is not None:
++            live = self.left_anchor
++        else:
+             return full_target
+-        a = self.ramp_alpha
+-        return [self.right_anchor[i] + a * (full_target[i] - self.right_anchor[i]) for i in range(3)]
++        return [live[i] + a * (full_target[i] - live[i]) for i in range(3)]
+ 
+     # ---- diagnostics ----------------------------------------------------
+ 
+@@ -359,9 +854,19 @@ class TeleopStartupAlignment:
+             "q_right_anchor": self.q_right_anchor,
+             "initial_alignment_error_xyz": self.initial_alignment_error_xyz,
+             "initial_alignment_error_norm": self.initial_alignment_error_norm,
++            "gravity_ramp_alpha": self.gravity_ramp_alpha,
++            "coupling_ramp_alpha": self.coupling_ramp_alpha,
+             "ramp_alpha": self.ramp_alpha,
+             "ready": self.ready,
+             "last_transitions": self._transitions[-5:],
++            "gravity_settle_quiet_since_t": self._quiet_since_t,
++            "gravity_settle_master_speed_mps": self.master_settle_velocity_norm_mps,
++            "gravity_settle_slave_speed_mps": self.slave_settle_velocity_norm_mps,
++            "gravity_settle_master_pose_drift_m": self.master_settle_pose_drift_m,
++            "gravity_settle_slave_pose_drift_m": self.slave_settle_pose_drift_m,
++            "gravity_settle_quiet_window_accumulated_s": self.settle_quiet_window_accumulated_s,
++            "gravity_settle_accepted_master_pose_drift_m": self.last_accepted_settle_master_pose_drift_m,
++            "gravity_settle_accepted_slave_pose_drift_m": self.last_accepted_settle_slave_pose_drift_m,
+         }
+ 
+ 
+@@ -378,3 +883,7 @@ def _peak_to_peak_norm(samples: List[_PoseSample]) -> float:
+ def _mean_pos(samples: List[_PoseSample]) -> List[float]:
+     n = len(samples)
+     return [sum(s.pos[axis] for s in samples) / n for axis in range(3)]
++
++
++def _norm3(v: List[float]) -> float:
++    return sum(x * x for x in v) ** 0.5
+diff --git a/projects/teleop_left_master_right_slave/scripts/tests/test_startup_alignment.py b/projects/teleop_left_master_right_slave/scripts/tests/test_startup_alignment.py
+index 1a16241..c0c21d2 100644
+--- a/projects/teleop_left_master_right_slave/scripts/tests/test_startup_alignment.py
++++ b/projects/teleop_left_master_right_slave/scripts/tests/test_startup_alignment.py
+@@ -13,7 +13,9 @@ from pathlib import Path
+ 
+ sys.path.insert(0, str(Path(__file__).parent.parent))
+ from startup_alignment import (  # noqa: E402
+-    ACTIVE, CAPTURE_ANCHORS, FAULT, HOLD_STILL, READY, RAMPING,
++    ACTIVE, CAPTURE_ANCHORS, FAULT, HOLD_STILL, READY,
++    GRAVITY_RAMP_UP, GRAVITY_SETTLE, COUPLING_RAMP_UP,
++    COUPLING_RAMP_DOWN, GRAVITY_RAMP_DOWN,
+     VALIDATE_ALIGNMENT, WAIT_FOR_POSES,
+     AlignmentConfig, TeleopStartupAlignment,
+ )
+@@ -37,6 +39,12 @@ def _fast_config(**overrides) -> AlignmentConfig:
+     cfg = AlignmentConfig(
+         pose_stale_s=0.2, hold_still_motion_m=0.003, hold_still_duration_s=0.5,
+         max_alignment_error_m=0.15, ramp_duration_s=1.0,
++        # Staged arm/disarm phases (2026-09-09) kept short so these
++        # deterministic-clock tests stay fast, matching this helper's own
++        # "_fast_config" purpose.
++        gravity_ramp_duration_s=0.1, gravity_settle_duration_s=0.05,
++        coupling_ramp_down_duration_s=1.0, self_follow_settle_duration_s=0.05,
++        gravity_ramp_down_duration_s=0.1,
+     )
+     for k, v in overrides.items():
+         setattr(cfg, k, v)
+@@ -51,6 +59,13 @@ def _settle_to_ready(align: TeleopStartupAlignment, clock: FakeClock,
+     while align.state != READY and align.state != FAULT and total < 5.0:
+         align.update_master_pose(list(master_pos), t=clock.t)
+         align.update_slave_pose(list(slave_pos), t=clock.t)
++        # Positions held constant here -> zero velocity, so GRAVITY_SETTLE's
++        # 2026-09-09 velocity-gated quiet-hold (see startup_alignment.py) is
++        # satisfied immediately once this helper's caller later arms and
++        # ticks through the arm sequence, matching this fake-clock unit
++        # test's "instantaneous, no real plant dynamics" model.
++        align.update_master_velocity([0.0, 0.0, 0.0])
++        align.update_slave_velocity([0.0, 0.0, 0.0])
+         align.tick(IDENTITY_MAP)
+         clock.advance(step_s)
+         total += step_s
+@@ -173,33 +188,63 @@ def test_failed_validation_prevents_arm():
+ # 7 & 8. Ramp starts at zero and reaches one monotonically.
+ # ---------------------------------------------------------------------------
+ def test_ramp_starts_at_zero_and_reaches_one_monotonically():
++    """2026-09-09 staged-transition rewrite: arm() now drives the sequence
++    GRAVITY_RAMP_UP -> GRAVITY_SETTLE -> COUPLING_RAMP_UP -> ACTIVE, with two
++    independent ramp scalars. Both gravity_ramp_alpha and coupling_ramp_alpha
++    (== the legacy ramp_alpha) must each start at 0, be monotonically
++    non-decreasing throughout, and reach exactly 1.0 by ACTIVE -- and
++    coupling_ramp_alpha must stay at exactly 0 for the whole gravity phase
++    (Part 1's "do not overload one ramp_alpha for unrelated physical
++    processes" -- verified here, not just asserted in a docstring)."""
+     clock = FakeClock()
+     align = TeleopStartupAlignment(_fast_config(ramp_duration_s=1.0), now_fn=clock)
+     _settle_to_ready(align, clock)
+     assert align.state == READY
++    assert align.gravity_ramp_alpha == 0.0
+     assert align.ramp_alpha == 0.0
+ 
+     align.arm()
+-    align.tick(IDENTITY_MAP)  # consumes the arm request, enters RAMPING
+-    assert align.state == RAMPING
+-    assert align.ramp_alpha == 0.0, "ramp must start at exactly 0, not jump"
+-
+-    prev_alpha = 0.0
+-    samples = []
++    align.tick(IDENTITY_MAP)  # consumes the arm request, enters GRAVITY_RAMP_UP
++    assert align.state == GRAVITY_RAMP_UP
++    assert align.gravity_ramp_alpha == 0.0, "gravity ramp must start at exactly 0, not jump"
++    assert align.ramp_alpha == 0.0, "coupling must not move at all during the gravity phase"
++
++    prev_gravity_alpha = 0.0
++    prev_coupling_alpha = 0.0
++    gravity_samples = []
++    coupling_samples = []
++    saw_coupling_zero_during_gravity_phase = False
+     total = 0.0
+-    while align.state == RAMPING and total < 2.0:
+-        clock.advance(0.05)
++    while align.state != ACTIVE and total < 2.0:
++        clock.advance(0.02)
+         align.update_master_pose([0.0, 0.0, 0.0], t=clock.t)
+         align.update_slave_pose([0.0, 0.0, 0.0], t=clock.t)
++        align.update_master_velocity([0.0, 0.0, 0.0])
++        align.update_slave_velocity([0.0, 0.0, 0.0])
+         align.tick(IDENTITY_MAP)
+-        assert align.ramp_alpha >= prev_alpha - 1e-9, "ramp_alpha must be monotonically non-decreasing"
+-        prev_alpha = align.ramp_alpha
+-        samples.append(align.ramp_alpha)
+-        total += 0.05
+-
+-    assert align.state == ACTIVE, f"ramp must complete into ACTIVE, ended in {align.state}"
++        assert align.gravity_ramp_alpha >= prev_gravity_alpha - 1e-9, \
++            "gravity_ramp_alpha must be monotonically non-decreasing"
++        assert align.ramp_alpha >= prev_coupling_alpha - 1e-9, \
++            "coupling_ramp_alpha (legacy ramp_alpha) must be monotonically non-decreasing"
++        if align.state in (GRAVITY_RAMP_UP, GRAVITY_SETTLE):
++            assert align.ramp_alpha == 0.0, (
++                f"coupling must stay exactly 0 during {align.state} -- critical invariant "
++                "(bilateral position error must not generate spring demand during the "
++                "gravity-only phase)")
++            saw_coupling_zero_during_gravity_phase = True
++        prev_gravity_alpha = align.gravity_ramp_alpha
++        prev_coupling_alpha = align.ramp_alpha
++        gravity_samples.append(align.gravity_ramp_alpha)
++        coupling_samples.append(align.ramp_alpha)
++        total += 0.02
++
++    assert align.state == ACTIVE, f"arm sequence must complete into ACTIVE, ended in {align.state}"
++    assert align.gravity_ramp_alpha == 1.0
+     assert align.ramp_alpha == 1.0
+-    assert len(samples) > 1, "ramp should take multiple ticks, not jump in one"
++    assert len(gravity_samples) > 1 and len(coupling_samples) > 1, "ramps should take multiple ticks, not jump in one"
++    assert saw_coupling_zero_during_gravity_phase, "test must actually observe the gravity-only phase"
++    assert any(0.0 < a < 1.0 for a in gravity_samples), "gravity ramp must pass through a genuine intermediate value"
++    assert any(0.0 < a < 1.0 for a in coupling_samples), "coupling ramp must pass through a genuine intermediate value"
+ 
+ 
+ # ---------------------------------------------------------------------------
+@@ -214,15 +259,21 @@ def test_no_target_discontinuity_at_ready_to_ramping():
+     full_target = [0.5, 0.3, 0.1]  # a large hypothetical mapped target, far from the anchor
+ 
+     # Blended target the instant BEFORE arming (alpha still 0 from READY).
++    # 2026-09-09 (unarmed-free-motion fix): while unarmed this now tracks the
++    # device's LIVE pose continuously, not a point frozen at anchor capture --
++    # so it need not be bit-identical to right_anchor (a mean of held-still
++    # samples), only numerically close, since the device hasn't moved since.
+     target_before = align.blend_target(full_target)
+-    assert target_before == align.right_anchor, (
+-        "before arming, the blended target must equal right_anchor exactly "
+-        "(zero commanded relative motion)"
+-    )
++    for i in range(3):
++        assert abs(target_before[i] - align.right_anchor[i]) < 1e-6, (
++            "before arming, the blended target must track the live (unmoved) "
++            "pose, which should closely match right_anchor here"
++        )
+ 
+     align.arm()
+-    align.tick(IDENTITY_MAP)  # -> RAMPING, alpha still 0.0 on the very first tick
+-    assert align.state == RAMPING
++    align.tick(IDENTITY_MAP)  # -> GRAVITY_RAMP_UP; coupling_ramp_alpha still 0.0 on the very first tick
++    assert align.state == GRAVITY_RAMP_UP
++    assert align.ramp_alpha == 0.0
+     target_at_ramp_start = align.blend_target(full_target)
+ 
+     for i in range(3):
+@@ -249,6 +300,8 @@ def test_active_uses_existing_anchor_relative_mapping():
+         clock.advance(0.05)
+         align.update_master_pose([0.0, 0.0, 0.0], t=clock.t)
+         align.update_slave_pose([0.03, 0.02, 0.01], t=clock.t)
++        align.update_master_velocity([0.0, 0.0, 0.0])
++        align.update_slave_velocity([0.0, 0.0, 0.0])
+         align.tick(IDENTITY_MAP)
+         total += 0.05
+     assert align.state == ACTIVE
+diff --git a/ros2_ws/src/touch_haptics/msg/BilateralStatus.msg b/ros2_ws/src/touch_haptics/msg/BilateralStatus.msg
+index ecb2eea..2c7617c 100644
+--- a/ros2_ws/src/touch_haptics/msg/BilateralStatus.msg
++++ b/ros2_ws/src/touch_haptics/msg/BilateralStatus.msg
+@@ -95,3 +95,18 @@ float64[3] effective_threshold_c4_nm
+ # (near-zero crossing rate) from being misclassified as a developing
+ # oscillation. See analyze_window() in bilateral_4ch.py.
+ float64 c1_zero_crossing_hz
++
++# Per-joint C1 mask actually applied this tick, added 2026-09-08 for
++# Scientific-controller Phase 5 telemetry (docs/SCIENTIFIC_HARDWARE_CODE_READINESS.md
++# Goal 5): 1.0 = joint contributes to the C1 relay, 0.0 = masked out
++# (bilateral_4ch.py's --c1-disable-joints). Previously only inferable
++# indirectly (received torque staying near zero on a loaded joint); this
++# makes the mask state a first-class, directly-observed quantity rather
++# than something a consumer has to reconstruct. Joint order
++# [waist, shoulder, elbow], matching every other per-joint field in this
++# message. NOT a per-joint WEIGHT (that concept doesn't exist yet -- the
++# mask is binary on/off) -- see the assumption register's shoulder-mask
++# entry for the SAFETY_ONLY/LEGACY_COMMISSIONING_PRESET classification of
++# the current default. C4 has no equivalent per-joint mask in the current
++# implementation (c4_joint_mask does not exist in bilateral_4ch.py).
++float64[3] c1_joint_mask
+diff --git a/ros2_ws/src/touch_haptics/msg/BridgeDiagnostics.msg b/ros2_ws/src/touch_haptics/msg/BridgeDiagnostics.msg
+index 06a2b5e..1b7e435 100644
+--- a/ros2_ws/src/touch_haptics/msg/BridgeDiagnostics.msg
++++ b/ros2_ws/src/touch_haptics/msg/BridgeDiagnostics.msg
+@@ -42,9 +42,94 @@ float64 alignment_error_norm_m
+ float64 follow_error_m
+ 
+ string bridge_state          # WAIT_FOR_POSES / HOLD_STILL / .../ ACTIVE / FAULT
++# bridge_state's full range as of the 2026-09-09 staged arm/disarm
++# transition: WAIT_FOR_POSES, HOLD_STILL, CAPTURE_ANCHORS,
++# VALIDATE_ALIGNMENT, READY, GRAVITY_RAMP_UP, GRAVITY_SETTLE,
++# COUPLING_RAMP_UP, ACTIVE, COUPLING_RAMP_DOWN, GRAVITY_RAMP_DOWN, FAULT --
++# see startup_alignment.py's module docstring for why gravity compensation
++# and bilateral position coupling are staged as separate phases rather than
++# ramped simultaneously (root-cause finding: doing both at once let a large
++# gravity-sagged slave/master separation combine with an unsupported-weight
++# transient, driving real force/position clamps during the old single-stage
++# RAMPING state).
+ float64 ramp_alpha
++# Legacy alias, ALWAYS exactly equal to coupling_ramp_alpha below -- kept so
++# existing consumers gating on `bridge_state=="ACTIVE" and ramp_alpha>=0.999`
++# (e.g. the scientific recorder) continue to work unchanged; state only
++# ever reaches ACTIVE once gravity_ramp_alpha has already reached 1.0, so
++# this remains an unambiguous "is bilateral coupling fully engaged" signal.
++
++float64 gravity_ramp_alpha    # 0->1 in GRAVITY_RAMP_UP, 1 through GRAVITY_SETTLE/COUPLING_RAMP_UP/ACTIVE/COUPLING_RAMP_DOWN/SELF_FOLLOW settle, 1->0 in GRAVITY_RAMP_DOWN
++float64 coupling_ramp_alpha   # 0 through READY/GRAVITY_RAMP_UP/GRAVITY_SETTLE, 0->1 in COUPLING_RAMP_UP, 1 in ACTIVE, 1->0 in COUPLING_RAMP_DOWN
++
+ bool c2_enabled
+ bool c3_enabled               # always true whenever this bridge runs at all
+ 
+ bool master_travel_limit_flag  # C2's left_max_offset_m clamp engaged this tick
+ bool slave_travel_limit_flag   # C3's max_offset_xyz clamp engaged this tick (any axis)
++
++# Bilateral force-budget-aware coupling planner (2026-09-09, production-
++# integration task) -- see coupling_force_budget.py. Only meaningful while
++# bridge_state==COUPLING_RAMP_UP; zero/false otherwise.
++#
++# 2026-09-09 Part 1 audit fix: the single master/slave_{force,position}
++# _margin_* pair this used to be conflated TWO different quantities
++# depending on whether the tick made progress (see coupling_force_budget.py's
++# AdaptiveCouplingRamp docstring for the full explanation) -- a HELD tick's
++# margin could be legitimately negative (that is WHY the candidate was
++# rejected) without the actual PUBLISHED target ever being unsafe, which
++# read as a false safety violation in diagnostics. Split into two explicit,
++# always-separately-populated pairs:
++#   accepted_*  -- margin of the CURRENTLY PUBLISHED target, recomputed
++#       fresh every tick against live pose/velocity. This is the ONLY one
++#       any hard safety assertion should check -- it must never be negative.
++#   candidate_* -- margin of the last bisection trial attempted this tick
++#       (diagnostic/explanatory only: why did/didn't alpha advance). CAN be
++#       legitimately negative on a held tick; that is expected, not a fault.
++float64 master_accepted_force_budget_margin_n
++float64 slave_accepted_force_budget_margin_n
++float64 master_accepted_position_error_margin_m
++float64 slave_accepted_position_error_margin_m
++float64 master_candidate_force_budget_margin_n
++float64 slave_candidate_force_budget_margin_n
++float64 master_candidate_position_error_margin_m
++float64 slave_candidate_position_error_margin_m
++bool coupling_ramp_held                # planner held alpha this tick (force/position budget binding)
++float64 coupling_ramp_stall_time_s     # elapsed since last accepted alpha progress
++bool force_budget_telemetry_fresh_left
++bool force_budget_telemetry_fresh_right
++
++# Planner's predicted pre-primary-clamp force for the candidate target it
++# accepted this tick -- comparable directly against each arm's own
++# CartesianControllerTelemetry.force_before_primary_clamp_n, which is how
++# predictor-vs-controller equivalence is measured (2026-09-09).
++float64[3] master_predicted_force_n
++float64[3] slave_predicted_force_n
++
++# Whether the bridge's DECLARED planner parameters (CLI args) agree with the
++# controller's own telemetry-reported stiffness/damping/max_force/
++# max_position_error. The planner USES the telemetry values (they are
++# authoritative); these flags exist so a launch-config/rig disagreement is
++# loud rather than silent, and a mismatch faults with
++# COUPLING_RAMP_PARAMETER_MISMATCH rather than proceeding.
++bool planner_parameter_match_left
++bool planner_parameter_match_right
++
++# GRAVITY_SETTLE observability (2026-09-09 Part 3/5, validation-
++# infrastructure follow-up) -- see startup_alignment.py's GRAVITY_SETTLE
++# tick() branch. Only meaningful while bridge_state==GRAVITY_SETTLE;
++# 0/false otherwise. Purpose: let the recorder/live tests verify the
++# velocity-gated quiet-hold is not passing on a pathological oscillation
++# zero-crossing (near-zero velocity for an instant while still swinging
++# through a large-amplitude motion) -- a velocity-only check cannot
++# distinguish that from genuine rest without also watching pose drift.
++float64 gravity_settle_master_speed_mps
++float64 gravity_settle_slave_speed_mps
++float64 gravity_settle_master_pose_drift_m   # drift over the CURRENT quiet window so far
++float64 gravity_settle_slave_pose_drift_m
++float64 gravity_settle_quiet_window_accumulated_s
++# Frozen at the moment the gate passes (the "final accepted quiet window"),
++# NOT reset afterward -- so a consumer reading this once bridge_state has
++# moved past GRAVITY_SETTLE still sees what the settle decision was based on.
++float64 gravity_settle_accepted_master_pose_drift_m
++float64 gravity_settle_accepted_slave_pose_drift_m
+diff --git a/ros2_ws/src/touch_haptics/sim/tests/test_c1_relay_live.py b/ros2_ws/src/touch_haptics/sim/tests/test_c1_relay_live.py
+index 545f80c..024f32e 100644
+--- a/ros2_ws/src/touch_haptics/sim/tests/test_c1_relay_live.py
++++ b/ros2_ws/src/touch_haptics/sim/tests/test_c1_relay_live.py
+@@ -162,8 +162,17 @@ def test_c1_relay_matches_slave_force_estimate():
+                 final_right = live.latest["right_fe"]
+                 final_left = live.latest["left_ext"]
+                 # Proportional, not bit-exact: bilateral_4ch's C1 path has no
+-                # filtering of its own (tau_c1 = w1*cf*tau_e_hat, a direct
+-                # multiply -- checked in bilateral_4ch.py, not assumed), but
++                # filtering of its own (tau_c1 = -w1*cf*tau_e_hat, a direct
++                # multiply with a sign flip -- opposing/reactive convention,
++                # matching this project's decided scientific target
++                # F_m ~= -F_s, 2026-09-08; see
++                # docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md. Prior to that decision
++                # this file's own comment and assertion below both encoded the
++                # old, un-negated code -- ratio was checked against
++                # (0.5, 1.5); now checked against (-1.5, -0.5), since the
++                # ONLY change is a sign flip: magnitude is unaffected, and
++                # this test's own run before/after the fix confirms that
++                # (ratio magnitude ~1.00 in both cases, sign flipped) -- but
+                 # this is still two independent processes each subscribing to
+                 # the DOB's output on their own schedule, and under load
+                 # (confirmed: this test alone got a tight, near-exact match;
+@@ -195,10 +204,11 @@ def test_c1_relay_matches_slave_force_estimate():
+                     if abs(final_right[i]) < 1e-3:
+                         continue  # axis not meaningfully loaded, skip
+                     ratio = final_left[i] / final_right[i]
+-                    assert 0.5 < ratio < 1.5, (
++                    assert -1.5 < ratio < -0.5, (
+                         f"C1 relay mismatch on {axis}: slave force_ext_hat="
+                         f"{final_right}, master joint_torque_ext_cmd={final_left}, "
+-                        f"ratio={ratio:.2f} (expected roughly 1.0)"
++                        f"ratio={ratio:.2f} (expected roughly -1.0, opposing "
++                        f"convention per docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md)"
+                     )
+     finally:
+         master.stop()
+diff --git a/ros2_ws/src/touch_haptics/sim/tests/test_c2_live.py b/ros2_ws/src/touch_haptics/sim/tests/test_c2_live.py
+index c696174..0e99109 100644
+--- a/ros2_ws/src/touch_haptics/sim/tests/test_c2_live.py
++++ b/ros2_ws/src/touch_haptics/sim/tests/test_c2_live.py
+@@ -15,6 +15,7 @@ exactly this scenario. This is that scenario, made permanent and CI-shaped.
+ """
+ from __future__ import annotations
+ 
++import subprocess
+ import sys
+ import tempfile
+ import time
+@@ -22,6 +23,7 @@ from pathlib import Path
+ 
+ import pytest
+ from geometry_msgs.msg import PoseStamped
++from touch_haptics.msg import BridgeDiagnostics
+ 
+ sys.path.insert(0, str(Path(__file__).parent))
+ from sim_common import LiveNode, ScriptProcess, SimNode, unique_ns  # noqa: E402
+@@ -43,10 +45,23 @@ def test_c2_master_target_tracks_slave_position():
+     # nothing (confirmed live: the slave "moved" 0.3mm instead of the
+     # expected ~10mm+ from F/k, not an error, just no force applied at all).
+     with SimNode(master_ns, device="Left",
++                # max_force_n/max_position_error_m overridden to match the
++                # bridge's own --master-max-force-n/--master-max-position-
++                # error-m defaults (2.0N/0.03m) -- otherwise the controller's
++                # telemetry (touch_slave_sim default 0.45N/0.02m) disagrees
++                # with the bridge's declared planner params and the
++                # 2026-09-09 production-integration task's parameter-
++                # consistency check correctly faults (COUPLING_RAMP_
++                # PARAMETER_MISMATCH) -- a pre-existing fixture gap, unrelated
++                # to the GRAVITY_SETTLE velocity-gating change.
+                 params={"stiffness_n_per_m": "15.0", "damping_n_s_per_m": "0.10",
++                       "max_force_n": "2.0", "max_position_error_m": "0.03",
+                        "require_deadman": "false"}) as master, \
+         SimNode(slave_ns, device="Default Device",
++                # max_force_n/max_position_error_m overridden -- see the
++                # master-side comment above.
+                 params={"stiffness_n_per_m": "35.0", "damping_n_s_per_m": "0.20",
++                       "max_force_n": "1.5", "max_position_error_m": "0.04",
+                        "require_deadman": "false"}) as slave:
+ 
+         calib_path = Path(tempfile.mkstemp(suffix=".json")[1])
+@@ -60,6 +75,10 @@ def test_c2_master_target_tracks_slave_position():
+             "--right-enable-topic", slave.topic("enable"),
+             "--left-target-topic", master.topic("target_pose"),
+             "--left-enable-topic", master.topic("enable"),
++            # 2026-09-09 production-integration task: see test_c3_live.py's
++            # matching comment.
++            "--left-telemetry-topic", master.topic("cartesian_controller_telemetry"),
++            "--right-telemetry-topic", slave.topic("cartesian_controller_telemetry"),
+             "--enable-c2", "true",
+             "--left-max-offset-m", "0.08",
+             "--calibration-file", str(calib_path),
+@@ -76,11 +95,54 @@ def test_c2_master_target_tracks_slave_position():
+                           extract=lambda m: (m.pose.position.x, m.pose.position.y, m.pose.position.z))
+                 live.watch("left_target", master.topic("target_pose"), PoseStamped,
+                           extract=lambda m: (m.pose.position.x, m.pose.position.y, m.pose.position.z))
++                live.watch("d", "/bridge_diagnostics", BridgeDiagnostics, extract=lambda x: x)
+ 
+                 live.spin_for(3.0)
+                 assert "right_pose" in live.latest, "no /pose from the slave stand-in"
+                 assert "left_target" in live.latest, (
+                     "no C2 output on the master's target_pose -- --enable-c2 not taking effect?")
++
++                # UNARMED check (2026-09-09 arm-gate fix): before arm_teleop is
++                # set, startup_alignment.py's blend_left_target() must hold C2's
++                # published target pinned to left_anchor regardless of how hard
++                # the slave is pushed -- this is exactly the gap that let the
++                # master render real (0.263N) force on real hardware while
++                # still in READY/unarmed state, on every trial before this fix.
++                prearm_left_target = live.latest["left_target"]
++                prearm_end = time.time() + 2.0
++                while time.time() < prearm_end:
++                    live.push_force(slave.topic("force_cmd"), slave.topic("enable"), 0.35, 0.0, 0.0)
++                    live.spin_once(timeout_sec=0.01)
++                after_prearm_left_target = live.latest["left_target"]
++                prearm_drift = sum(
++                    abs(after_prearm_left_target[i] - prearm_left_target[i]) for i in range(3))
++                assert prearm_drift < 0.001, (
++                    f"C2 published target moved {prearm_drift*1000:.3f}mm while UNARMED -- "
++                    "the arm gate is not holding (blend_left_target not wired into _update_c2?)"
++                )
++
++                r = subprocess.run(
++                    ["ros2", "param", "set", "/touch_master_slave_bridge", "arm_teleop", "true"],
++                    capture_output=True, text=True, timeout=10)
++                assert "successful" in r.stdout, f"arm_teleop param set failed: {r.stdout} {r.stderr}"
++                # Wait for ACTIVE (bridge_state) before using the tracking math
++                # below, which assumes full (alpha=1) C2 behavior. NOT a fixed
++                # spin_for(1.5) any more -- 2026-09-09's velocity-gated
++                # GRAVITY_SETTLE (see startup_alignment.py) makes the total
++                # arm-sequence duration variable (it waits for genuine
++                # mechanical quiescence, not a fixed 0.2s clock), so polling
++                # the real state is required, not assuming a fixed schedule.
++                deadline = time.time() + 15.0
++                while time.time() < deadline:
++                    live.spin_once(timeout_sec=0.01)
++                    d = live.latest.get("d")
++                    if d is not None and d.bridge_state == "ACTIVE":
++                        break
++                    if d is not None and d.bridge_state == "FAULT":
++                        raise AssertionError(f"bridge FAULTed while waiting for ACTIVE: {d}")
++                else:
++                    raise AssertionError("bridge never reached ACTIVE within 15s")
++
+                 baseline_right = live.latest["right_pose"]
+                 baseline_left_target = live.latest["left_target"]
+ 
+diff --git a/ros2_ws/src/touch_haptics/sim/tests/test_c3_live.py b/ros2_ws/src/touch_haptics/sim/tests/test_c3_live.py
+index 7e3fa3a..1fec6ec 100644
+--- a/ros2_ws/src/touch_haptics/sim/tests/test_c3_live.py
++++ b/ros2_ws/src/touch_haptics/sim/tests/test_c3_live.py
+@@ -13,6 +13,7 @@ axis-mapping-unresolved-bug project memory).
+ """
+ from __future__ import annotations
+ 
++import subprocess
+ import sys
+ import tempfile
+ import time
+@@ -20,6 +21,7 @@ from pathlib import Path
+ 
+ import pytest
+ from geometry_msgs.msg import PoseStamped
++from touch_haptics.msg import BridgeDiagnostics
+ 
+ sys.path.insert(0, str(Path(__file__).parent))
+ from sim_common import LiveNode, ScriptProcess, SimNode, unique_ns  # noqa: E402
+@@ -40,10 +42,18 @@ def test_c3_slave_target_tracks_master_position():
+     # override, force_cmd is silently gated off (see test_c2_live.py's
+     # matching comment for how that showed up).
+     with SimNode(master_ns, device="Left",
++                # max_force_n/max_position_error_m overridden -- see
++                # test_c2_live.py's matching comment.
+                 params={"stiffness_n_per_m": "15.0", "damping_n_s_per_m": "0.10",
++                       "max_force_n": "2.0", "max_position_error_m": "0.03",
+                        "require_deadman": "false"}) as master, \
+         SimNode(slave_ns, device="Default Device",
++                # max_force_n/max_position_error_m overridden to match the
++                # bridge's own --slave-max-force-n/--slave-max-position-
++                # error-m defaults (1.5N/0.04m) -- see test_c2_live.py's
++                # matching master-side comment.
+                 params={"stiffness_n_per_m": "35.0", "damping_n_s_per_m": "0.20",
++                       "max_force_n": "1.5", "max_position_error_m": "0.04",
+                        "require_deadman": "false"}) as slave:
+ 
+         calib_path = Path(tempfile.mkstemp(suffix=".json")[1])
+@@ -55,6 +65,13 @@ def test_c3_slave_target_tracks_master_position():
+             "--right-pose-topic", slave.topic("pose"),
+             "--right-target-topic", slave.topic("target_pose"),
+             "--right-enable-topic", slave.topic("enable"),
++            # 2026-09-09 production-integration task: the bilateral force-
++            # budget planner (COUPLING_RAMP_UP) needs BOTH arms' telemetry
++            # to avoid holding alpha / faulting on stale telemetry -- must
++            # point at this test's own namespaced topics, not the (here,
++            # nonexistent) real-hardware default.
++            "--left-telemetry-topic", master.topic("cartesian_controller_telemetry"),
++            "--right-telemetry-topic", slave.topic("cartesian_controller_telemetry"),
+             "--calibration-file", str(calib_path),
+             "--axis-map", "x,y,z",
+             "--rate-hz", "100",
+@@ -64,13 +81,47 @@ def test_c3_slave_target_tracks_master_position():
+         ) as bridge:
+             bridge.wait_for_marker("teleoperation live", timeout=15.0)
+ 
++            # startup_alignment.py's READY->RAMPING->ACTIVE gate (added
++            # 2026-09-08, after this test was first written) blends C3's
++            # commanded target from right_anchor (frozen, zero relative
++            # motion) toward the real target only once armed -- without
++            # this, the target legitimately never moves regardless of how
++            # far the master is pushed, which is exactly what a 2026-09-09
++            # root-cause investigation found this test silently hitting
++            # (right_target frozen bit-for-bit at right_anchor for the
++            # entire test). This is the same one-line fix used throughout
++            # that investigation's own scripts. See
++            # docs/... (bridge/C2-C3 frame-mixing root-cause report) for
++            # the full trace -- this is a STALE TEST ASSUMPTION fix, not a
++            # bridge code change.
++            r = subprocess.run(
++                ["ros2", "param", "set", "/touch_master_slave_bridge", "arm_teleop", "true"],
++                capture_output=True, text=True, timeout=10)
++            assert "successful" in r.stdout, f"arm_teleop param set failed: {r.stdout} {r.stderr}"
++
+             with LiveNode("c3_verify") as live:
+                 live.watch("left_pose", master.topic("pose"), PoseStamped,
+                           extract=lambda m: (m.pose.position.x, m.pose.position.y, m.pose.position.z))
+                 live.watch("right_target", slave.topic("target_pose"), PoseStamped,
+                           extract=lambda m: (m.pose.position.x, m.pose.position.y, m.pose.position.z))
+-
+-                live.spin_for(3.0)
++                live.watch("d", "/bridge_diagnostics", BridgeDiagnostics, extract=lambda x: x)
++
++                # Wait for ACTIVE (bridge_state), not a fixed spin_for(3.0) --
++                # 2026-09-09's velocity-gated GRAVITY_SETTLE (see
++                # startup_alignment.py) makes the total arm-sequence duration
++                # variable (waits for genuine mechanical quiescence, not a
++                # fixed clock), so the push-force comparison below must not
++                # assume a fixed schedule has completed by a fixed wall time.
++                deadline = time.time() + 15.0
++                while time.time() < deadline:
++                    live.spin_once(timeout_sec=0.01)
++                    d = live.latest.get("d")
++                    if d is not None and d.bridge_state == "ACTIVE":
++                        break
++                    if d is not None and d.bridge_state == "FAULT":
++                        raise AssertionError(f"bridge FAULTed while waiting for ACTIVE: {d}")
++                else:
++                    raise AssertionError("bridge never reached ACTIVE within 15s")
+                 assert "left_pose" in live.latest, "no /pose from the master stand-in"
+                 assert "right_target" in live.latest, "no C3 output on the slave's target_pose"
+                 baseline_left = live.latest["left_pose"]
+diff --git a/ros2_ws/src/touch_haptics/src/touch_slave.cpp b/ros2_ws/src/touch_haptics/src/touch_slave.cpp
+index 3dedd55..578664b 100644
+--- a/ros2_ws/src/touch_haptics/src/touch_slave.cpp
++++ b/ros2_ws/src/touch_haptics/src/touch_slave.cpp
+@@ -294,6 +294,14 @@ public:
+     // vs. joint-space PD+gravity+friction output) and conflating them would
+     // silently change one when tuning the other.
+     dob_torque_f_max_n_ = declare_parameter<double>("dob_torque_f_max_n", 0.9);
++    // Scientific-controller Phase 4B sweep hook, added 2026-09-08: overrides
++    // the g_dis values below (default -1.0 = "no override, use the shipped
++    // per-joint kGDis array unchanged"). Simulation-only use so far
++    // (analysis/scientific_4ch/phase4b_*); does not change default behavior
++    // on any existing launch (all defaults are -1.0). NOT a claim that any
++    // override value is better -- purely a sweep capability, see
++    // docs/SCIENTIFIC_DOB_VALIDATION.md Phase 4B.
++    dob_g_dis_override_rad_s_ = declare_parameter<double>("dob_g_dis_override_rad_s", -1.0);
+     max_position_error_m_ = declare_parameter<double>("max_position_error_m", 0.04);
+     stale_timeout_s_ = declare_parameter<double>("stale_timeout_s", 0.05);
+     require_deadman_ = declare_parameter<bool>("require_deadman", true);
+@@ -496,13 +504,23 @@ private:
+     // against 32 ms before. Contact onset is perceived correspondingly later.
+     // The paper offsets this with a neural-network contact detector; we have no
+     // equivalent, so the lag is simply accepted for now.
+-    const double kGDis[3]      = {10.0, 10.0, 5.0};             // rad/s
++    double kGDis[3]      = {10.0, 10.0, 5.0};             // rad/s
+     const double kThreshold[3] = {0.07632, 0.06400, 0.05000};   // 2 x p99, independent of f_max
+     // Was a hardcoded {0.162, 0.081, 0.081} array (f_max=0.6N) until
+     // 2026-09-02; now derived at runtime from dob_torque_f_max_n_ (default
+     // 0.6N, so this reproduces the exact same numbers unless overridden).
+     const touch_haptics::Vec3 kMaxTorque =
+       touch_haptics::derivePerJointTorqueLimits(dob_torque_f_max_n_);
++    if (dob_g_dis_override_rad_s_ > 0.0) {
++      // Phase 4B sweep hook: uniform override across all 3 joints, matching
++      // the historical single-value hardware comparison table this session
++      // cites (touch_slave.cpp's own g_dis comment above). threshold_nm is
++      // intentionally NOT re-derived here (still the shipped per-joint
++      // values) -- Phase 4B measures raw tau_dis_hat_nm magnitude directly,
++      // which does not depend on threshold_nm; only the contact GATE would,
++      // and this sweep does not use the gate.
++      for (int i = 0; i < 3; ++i) kGDis[i] = dob_g_dis_override_rad_s_;
++    }
+     for (int i = 0; i < touch_haptics::kNumActiveJoints; ++i) {
+       cfg.joints[i].g_dis_rad_s = kGDis[i];
+       cfg.joints[i].threshold_nm = kThreshold[i];
+@@ -1639,6 +1657,7 @@ private:
+   double damping_n_s_per_m_{0.08};
+   double max_force_n_{0.45};
+   double dob_torque_f_max_n_{0.6};
++  double dob_g_dis_override_rad_s_{-1.0};  // Phase 4B sweep hook, see declare_parameter site
+   double dob_servo_period_s_{0.001};  // fallback matches configureDob()'s 1000Hz default
+   // Low-pass filtered qdot, joint-space PD path only -- see the Coulomb
+   // breakaway feedforward block below for why this exists and why it is a

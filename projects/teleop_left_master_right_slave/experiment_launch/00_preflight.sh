@@ -31,10 +31,9 @@ reject_live_component 'bridge_master_slave.py' 'position bridge'
 reject_live_component 'bilateral_4ch.py' 'force relay'
 
 if [[ "${DRY_RUN}" == false ]]; then
-  [[ -e /dev/ttyACM0 && -e /dev/ttyACM1 ]] || {
-    echo "[preflight][error] expected two devices at /dev/ttyACM0 and /dev/ttyACM1" >&2; exit 1; }
-  [[ -r /dev/ttyACM0 && -w /dev/ttyACM0 && -r /dev/ttyACM1 && -w /dev/ttyACM1 ]] || {
-    echo "[preflight][error] device permissions insufficient; not changing permissions automatically" >&2; exit 1; }
+  python3 "${PROJECT_ROOT}/hardware_validation/check_touch_devices.py" \
+    --left-config "${LEFT_CFG}" \
+    --right-config "${RIGHT_CFG}"
 fi
 
 current_file="${LAUNCH_DIR}/.current_session"
@@ -44,7 +43,7 @@ if [[ -f "${current_file}" ]]; then
 fi
 
 echo "[preflight] session=${SESSION_ID} mode=${CONTROLLER_MODE} output=${SESSION_DIR}"
-echo "[preflight] master=Left (/dev/ttyACM0 config); slave=Default Device (/dev/ttyACM1 config)"
+echo "[preflight] master=Left (channel 300, /dev/ttyACM300, usb-0:10.1); slave=Default Device (channel 301, /dev/ttyACM301, usb-0:10.2)"
 echo "[preflight] startup is ZERO-FORCE: joint_space_control=false, enabled_on_start=false, C1=C2=C3=C4=0"
 echo "[preflight] DOB observation: left enabled; right explicitly enabled; no DOB output is applied"
 echo "[preflight] normal/emergency stop: ${LAUNCH_DIR}/99_stop_setup.sh --session ${SESSION_ID} --output-dir ${OUTPUT_DIR}"

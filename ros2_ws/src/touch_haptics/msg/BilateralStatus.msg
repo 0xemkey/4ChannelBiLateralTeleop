@@ -95,3 +95,18 @@ float64[3] effective_threshold_c4_nm
 # (near-zero crossing rate) from being misclassified as a developing
 # oscillation. See analyze_window() in bilateral_4ch.py.
 float64 c1_zero_crossing_hz
+
+# Per-joint C1 mask actually applied this tick, added 2026-09-08 for
+# Scientific-controller Phase 5 telemetry (docs/SCIENTIFIC_HARDWARE_CODE_READINESS.md
+# Goal 5): 1.0 = joint contributes to the C1 relay, 0.0 = masked out
+# (bilateral_4ch.py's --c1-disable-joints). Previously only inferable
+# indirectly (received torque staying near zero on a loaded joint); this
+# makes the mask state a first-class, directly-observed quantity rather
+# than something a consumer has to reconstruct. Joint order
+# [waist, shoulder, elbow], matching every other per-joint field in this
+# message. NOT a per-joint WEIGHT (that concept doesn't exist yet -- the
+# mask is binary on/off) -- see the assumption register's shoulder-mask
+# entry for the SAFETY_ONLY/LEGACY_COMMISSIONING_PRESET classification of
+# the current default. C4 has no equivalent per-joint mask in the current
+# implementation (c4_joint_mask does not exist in bilateral_4ch.py).
+float64[3] c1_joint_mask

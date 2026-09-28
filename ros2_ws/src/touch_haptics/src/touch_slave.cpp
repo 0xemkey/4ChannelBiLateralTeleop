@@ -294,6 +294,24 @@ public:
     // vs. joint-space PD+gravity+friction output) and conflating them would
     // silently change one when tuning the other.
     dob_torque_f_max_n_ = declare_parameter<double>("dob_torque_f_max_n", 0.9);
+    // Scientific-controller Phase 4B sweep hook, added 2026-09-08: overrides
+    // the g_dis values below (default -1.0 = "no override, use the shipped
+    // per-joint kGDis array unchanged"). Simulation-only use so far
+    // (analysis/scientific_4ch/phase4b_*); does not change default behavior
+    // on any existing launch (all defaults are -1.0). NOT a claim that any
+    // override value is better -- purely a sweep capability, see
+    // docs/SCIENTIFIC_DOB_VALIDATION.md Phase 4B.
+    dob_g_dis_override_rad_s_ = declare_parameter<double>("dob_g_dis_override_rad_s", -1.0);
+    // Preferred scientific sweep mechanism as of 2026-09-10: a per-joint
+    // BANDWIDTH SCALE rather than a uniform absolute override -- scale=1.5
+    // on the {10,10,5} baseline gives {15,15,7.5}, preserving the paper's
+    // per-joint ratio (waist=shoulder=2x elbow) instead of collapsing it to
+    // one value the way dob_g_dis_override_rad_s_ does. Default 1.0 =
+    // shipped kGDis array unchanged. Kept independent of the override param
+    // for backward compatibility; see configureDob() for precedence (the
+    // override, if set, still wins -- it is a different, coarser sweep tool,
+    // not superseded).
+    dob_g_dis_scale_ = declare_parameter<double>("dob_g_dis_scale", 1.0);
     max_position_error_m_ = declare_parameter<double>("max_position_error_m", 0.04);
     stale_timeout_s_ = declare_parameter<double>("stale_timeout_s", 0.05);
     require_deadman_ = declare_parameter<bool>("require_deadman", true);
@@ -496,13 +514,32 @@ private:
     // against 32 ms before. Contact onset is perceived correspondingly later.
     // The paper offsets this with a neural-network contact detector; we have no
     // equivalent, so the lag is simply accepted for now.
-    const double kGDis[3]      = {10.0, 10.0, 5.0};             // rad/s
+    double kGDis[3]      = {10.0, 10.0, 5.0};             // rad/s
     const double kThreshold[3] = {0.07632, 0.06400, 0.05000};   // 2 x p99, independent of f_max
     // Was a hardcoded {0.162, 0.081, 0.081} array (f_max=0.6N) until
     // 2026-09-02; now derived at runtime from dob_torque_f_max_n_ (default
     // 0.6N, so this reproduces the exact same numbers unless overridden).
     const touch_haptics::Vec3 kMaxTorque =
       touch_haptics::derivePerJointTorqueLimits(dob_torque_f_max_n_);
+    if (dob_g_dis_override_rad_s_ > 0.0) {
+      // Phase 4B sweep hook: uniform override across all 3 joints, matching
+      // the historical single-value hardware comparison table this session
+      // cites (touch_slave.cpp's own g_dis comment above). threshold_nm is
+      // intentionally NOT re-derived here (still the shipped per-joint
+      // values) -- Phase 4B measures raw tau_dis_hat_nm magnitude directly,
+      // which does not depend on threshold_nm; only the contact GATE would,
+      // and this sweep does not use the gate. Takes precedence over
+      // dob_g_dis_scale_ below -- it is a coarser, uniform-value sweep tool
+      // that predates the scale and is kept working unchanged; a caller
+      // that sets both is explicitly asking for the absolute override.
+      for (int i = 0; i < 3; ++i) kGDis[i] = dob_g_dis_override_rad_s_;
+    } else if (dob_g_dis_scale_ != 1.0) {
+      // Preferred sweep mechanism (2026-09-10): scales the shipped per-joint
+      // baseline rather than collapsing it to one value, so scale=1.5 gives
+      // {15,15,7.5} -- same threshold_nm caveat as the override above (not
+      // re-derived; this sweep does not use the contact gate either).
+      for (int i = 0; i < 3; ++i) kGDis[i] *= dob_g_dis_scale_;
+    }
     for (int i = 0; i < touch_haptics::kNumActiveJoints; ++i) {
       cfg.joints[i].g_dis_rad_s = kGDis[i];
       cfg.joints[i].threshold_nm = kThreshold[i];
@@ -1639,6 +1676,8 @@ private:
   double damping_n_s_per_m_{0.08};
   double max_force_n_{0.45};
   double dob_torque_f_max_n_{0.6};
+  double dob_g_dis_override_rad_s_{-1.0};  // Phase 4B sweep hook, see declare_parameter site
+  double dob_g_dis_scale_{1.0};  // preferred sweep mechanism, see declare_parameter site
   double dob_servo_period_s_{0.001};  // fallback matches configureDob()'s 1000Hz default
   // Low-pass filtered qdot, joint-space PD path only -- see the Coulomb
   // breakaway feedforward block below for why this exists and why it is a

@@ -17,6 +17,9 @@ REPO_ROOT="$(cd "${PROJECT_ROOT}/../.." && pwd)"
 TOUCH_WS="${TOUCH_WS:-${REPO_ROOT}/ros2_ws}"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 PUBLISH_HZ="${PUBLISH_HZ:-200}"
+# TO_BE_OPTIMIZED (C3): current BASELINE values, not scientifically
+# validated optima -- already configurable via these env vars, no numeric
+# change made here. See docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md.
 MAX_FORCE_N="${MAX_FORCE_N:-1.5}"
 STIFFNESS_N_PER_M="${STIFFNESS_N_PER_M:-35.0}"
 DAMPING_N_S_PER_M="${DAMPING_N_S_PER_M:-0.20}"
@@ -34,6 +37,9 @@ PUBLISH_TELEMETRY="${PUBLISH_TELEMETRY:-true}"
 JOINT_SPACE_CONTROL="${JOINT_SPACE_CONTROL:-false}"
 DOB_ENABLE="${DOB_ENABLE:-false}"
 DOB_TORQUE_F_MAX_N="${DOB_TORQUE_F_MAX_N:-0.6}"
+# 2026-09-10: preferred DOB bandwidth sweep mechanism, see run_master_left.sh's
+# matching comment. Default 1.0 leaves g_dis unchanged.
+DOB_G_DIS_SCALE="${DOB_G_DIS_SCALE:-1.0}"
 DOB_INERTIA_JSON="${DOB_INERTIA_JSON:-${HOME}/dob_logs/results/inertia_right.json}"
 DOB_GRAVITY_JSON="${DOB_GRAVITY_JSON:-${HOME}/dob_logs/results/gravity_right_minimal.json}"
 RIGHT_SLAVE_INVERT_X="${RIGHT_SLAVE_INVERT_X:-false}"
@@ -87,6 +93,7 @@ exec runuser -u '${TARGET_USER}' -- env \
   JOINT_SPACE_CONTROL='${JOINT_SPACE_CONTROL}' \
   DOB_ENABLE='${DOB_ENABLE}' \
   DOB_TORQUE_F_MAX_N='${DOB_TORQUE_F_MAX_N}' \
+  DOB_G_DIS_SCALE='${DOB_G_DIS_SCALE}' \
   DOB_INERTIA_JSON='${DOB_INERTIA_JSON}' \
   DOB_GRAVITY_JSON='${DOB_GRAVITY_JSON}' \
   RIGHT_SLAVE_INVERT_X='${RIGHT_SLAVE_INVERT_X}' \
@@ -135,6 +142,7 @@ exec ros2 run touch_haptics touch_slave --ros-args \
   -p swap_xy:="${RIGHT_SLAVE_SWAP_XY}" \
   -p joint_space_control:="${JOINT_SPACE_CONTROL}" \
   -p dob_torque_f_max_n:="${DOB_TORQUE_F_MAX_N}" \
+  -p dob_g_dis_scale:="${DOB_G_DIS_SCALE}" \
   -p dob_inertia_json:="${DOB_INERTIA_JSON}" \
   -p dob_gravity_json:="${DOB_GRAVITY_JSON}" \
   -r pose:=/touch_right/pose \

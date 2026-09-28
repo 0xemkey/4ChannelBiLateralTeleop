@@ -1,0 +1,140 @@
+{
+  "X": {
+    "representative_joint": "waist",
+    "condition_a": {
+      "rmse_mm": 9.69,
+      "mae_mm": 8.05,
+      "lag_ms": 50.0,
+      "reach_ratio": 0.918
+    },
+    "condition_b": {
+      "waist": {
+        "src_peak_nm": 0.24097,
+        "rcv_peak_nm": 0.12049,
+        "gain": 0.5,
+        "sign_consistent": true,
+        "response_delay_ms": 5.0,
+        "release_to_baseline_ms": 1245.0,
+        "src_std": 0.11337,
+        "rcv_std": 0.05669
+      },
+      "shoulder": {
+        "src_peak_nm": 0.07441,
+        "rcv_peak_nm": 0.0,
+        "gain": 0.0,
+        "sign_consistent": null,
+        "response_delay_ms": -915.0,
+        "release_to_baseline_ms": 455.0,
+        "src_std": 0.01347,
+        "rcv_std": 0.0
+      },
+      "elbow": {
+        "src_peak_nm": 0.09219,
+        "rcv_peak_nm": 0.04609,
+        "gain": 0.5,
+        "sign_consistent": true,
+        "response_delay_ms": 5.0,
+        "release_to_baseline_ms": 4764.9,
+        "src_std": 0.02044,
+        "rcv_std": 0.01022
+      }
+    },
+    "c1_active_pct_condA": 100.0,
+    "c1_active_pct_condB": 100.0,
+    "master_range_mm_condB": 15.56,
+    "slave_range_mm_condB": 181.99,
+    "master_held_ok": true
+  },
+  "Y": {
+    "representative_joint": "shoulder",
+    "condition_a": {
+      "rmse_mm": 10.02,
+      "mae_mm": 9.32,
+      "lag_ms": 75.0,
+      "reach_ratio": 0.975
+    },
+    "condition_b": {
+      "waist": {
+        "src_peak_nm": 0.04164,
+        "rcv_peak_nm": 0.02082,
+        "gain": 0.5,
+        "sign_consistent": true,
+        "response_delay_ms": 5.0,
+        "release_to_baseline_ms": 115.0,
+        "src_std": 0.0053,
+        "rcv_std": 0.00265
+      },
+      "shoulder": {
+        "src_peak_nm": 0.16242,
+        "rcv_peak_nm": 0.0,
+        "gain": 0.0,
+        "sign_consistent": null,
+        "response_delay_ms": -4629.9,
+        "release_to_baseline_ms": 1290.0,
+        "src_std": 0.05304,
+        "rcv_std": 0.0
+      },
+      "elbow": {
+        "src_peak_nm": 0.11262,
+        "rcv_peak_nm": 0.05631,
+        "gain": 0.5,
+        "sign_consistent": true,
+        "response_delay_ms": 5.0,
+        "release_to_baseline_ms": 575.0,
+        "src_std": 0.03275,
+        "rcv_std": 0.01638
+      }
+    },
+    "c1_active_pct_condA": 100.0,
+    "c1_active_pct_condB": 100.0,
+    "master_range_mm_condB": 2.77,
+    "slave_range_mm_condB": 173.34,
+    "master_held_ok": true
+  },
+  "Z": {
+    "representative_joint": "elbow",
+    "condition_a": {
+      "rmse_mm": 8.81,
+      "mae_mm": 7.45,
+      "lag_ms": 85.0,
+      "reach_ratio": 0.896
+    },
+    "condition_b": {
+      "waist": {
+        "src_peak_nm": 0.0966,
+        "rcv_peak_nm": 0.0483,
+        "gain": 0.5,
+        "sign_consistent": true,
+        "response_delay_ms": 5.0,
+        "release_to_baseline_ms": null,
+        "src_std": 0.02247,
+        "rcv_std": 0.01124
+      },
+      "shoulder": {
+        "src_peak_nm": 0.19795,
+        "rcv_peak_nm": 0.0,
+        "gain": 0.0,
+        "sign_consistent": null,
+        "response_delay_ms": -18954.6,
+        "release_to_baseline_ms": null,
+        "src_std": 0.04769,
+        "rcv_std": 0.0
+      },
+      "elbow": {
+        "src_peak_nm": 0.23033,
+        "rcv_peak_nm": 0.11516,
+        "gain": 0.5,
+        "sign_consistent": true,
+        "response_delay_ms": 5.0,
+        "release_to_baseline_ms": 1490.0,
+        "src_std": 0.11117,
+        "rcv_std": 0.05558
+      }
+    },
+    "c1_active_pct_condA": 100.0,
+    "c1_active_pct_condB": 100.0,
+    "master_range_mm_condB": 6.74,
+    "slave_range_mm_condB": 153.71,
+    "master_held_ok": true
+  }
+}

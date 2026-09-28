@@ -162,8 +162,17 @@ def test_c1_relay_matches_slave_force_estimate():
                 final_right = live.latest["right_fe"]
                 final_left = live.latest["left_ext"]
                 # Proportional, not bit-exact: bilateral_4ch's C1 path has no
-                # filtering of its own (tau_c1 = w1*cf*tau_e_hat, a direct
-                # multiply -- checked in bilateral_4ch.py, not assumed), but
+                # filtering of its own (tau_c1 = -w1*cf*tau_e_hat, a direct
+                # multiply with a sign flip -- opposing/reactive convention,
+                # matching this project's decided scientific target
+                # F_m ~= -F_s, 2026-09-08; see
+                # docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md. Prior to that decision
+                # this file's own comment and assertion below both encoded the
+                # old, un-negated code -- ratio was checked against
+                # (0.5, 1.5); now checked against (-1.5, -0.5), since the
+                # ONLY change is a sign flip: magnitude is unaffected, and
+                # this test's own run before/after the fix confirms that
+                # (ratio magnitude ~1.00 in both cases, sign flipped) -- but
                 # this is still two independent processes each subscribing to
                 # the DOB's output on their own schedule, and under load
                 # (confirmed: this test alone got a tight, near-exact match;
@@ -195,10 +204,11 @@ def test_c1_relay_matches_slave_force_estimate():
                     if abs(final_right[i]) < 1e-3:
                         continue  # axis not meaningfully loaded, skip
                     ratio = final_left[i] / final_right[i]
-                    assert 0.5 < ratio < 1.5, (
+                    assert -1.5 < ratio < -0.5, (
                         f"C1 relay mismatch on {axis}: slave force_ext_hat="
                         f"{final_right}, master joint_torque_ext_cmd={final_left}, "
-                        f"ratio={ratio:.2f} (expected roughly 1.0)"
+                        f"ratio={ratio:.2f} (expected roughly -1.0, opposing "
+                        f"convention per docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md)"
                     )
     finally:
         master.stop()

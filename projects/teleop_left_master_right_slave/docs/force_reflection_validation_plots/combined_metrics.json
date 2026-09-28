@@ -1,0 +1,32 @@
+{
+  "master_range_mm_condB": {
+    "x": 8.01,
+    "y": 2.28,
+    "z": 6.85
+  },
+  "slave_range_mm_condB": {
+    "x": 299.16,
+    "y": 149.6,
+    "z": 159.22
+  },
+  "master_held_ok": true,
+  "waist": {
+    "src_peak_nm": 0.33279,
+    "rcv_peak_nm": 0.1664,
+    "gain": 0.5,
+    "sign_consistent": true
+  },
+  "shoulder": {
+    "src_peak_nm": 0.24256,
+    "rcv_peak_nm": 0.0,
+    "gain": 0.0,
+    "sign_consistent": null
+  },
+  "elbow": {
+    "src_peak_nm": 0.19116,
+    "rcv_peak_nm": 0.09558,
+    "gain": 0.5,
+    "sign_consistent": true
+  },
+  "c1_active_pct_condB": 100.0
+}

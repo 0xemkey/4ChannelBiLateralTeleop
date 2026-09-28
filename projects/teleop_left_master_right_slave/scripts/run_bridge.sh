@@ -78,6 +78,21 @@ SLAVE_GRAVITY_AXIS="${SLAVE_GRAVITY_AXIS:-1}"
 # raise until Y stops sagging, same method as the slave's own tuning.
 LEFT_GRAVITY_COMP_N="${LEFT_GRAVITY_COMP_N:-0.0}"
 LEFT_GRAVITY_AXIS="${LEFT_GRAVITY_AXIS:-1}"
+# Declared master planner parameters, cross-checked live against the
+# master controller's own telemetry (bridge_master_slave.py's
+# planner_parameter_match_left) -- a mismatch faults the startup state
+# machine rather than silently coupling against the wrong physics.
+# Defaults match run_master_left.sh's own production defaults (15.0 /
+# 0.10 / 2.0 / 0.03). Any launcher that starts a master driver with
+# different gains (e.g. 01b_start_master_c2_diagnostic.sh's 5.0 / 0.05 /
+# 0.5 diagnostic gains) MUST set these to the same values, or
+# planner_parameter_match_left will correctly go false and fault
+# (2026-09-10, found via a real-hardware C2-only FAULT: run_bridge.sh
+# had no wiring for these four bridge CLI args at all).
+MASTER_STIFFNESS_N_PER_M="${MASTER_STIFFNESS_N_PER_M:-15.0}"
+MASTER_DAMPING_N_S_PER_M="${MASTER_DAMPING_N_S_PER_M:-0.10}"
+MASTER_MAX_FORCE_N="${MASTER_MAX_FORCE_N:-2.0}"
+MASTER_MAX_POSITION_ERROR_M="${MASTER_MAX_POSITION_ERROR_M:-0.03}"
 MAX_SPEED_MPS="${MAX_SPEED_MPS:-0.5}"
 DEADBAND_M="${DEADBAND_M:-0.0002}"
 RATE_HZ="${RATE_HZ:-100}"
@@ -91,6 +106,21 @@ REPORT_INTERVAL_S="${REPORT_INTERVAL_S:-0.5}"
 # than a tracking-error-derived force.
 ENABLE_C2="${ENABLE_C2:-false}"
 LEFT_MAX_OFFSET_M="${LEFT_MAX_OFFSET_M:-0.08}"
+# C3: master position -> slave target. On by default -- this has been the
+# always-on production channel throughout this project's history; added
+# as an explicit, overridable variable (2026-09-10, C2-only real-hardware
+# validation prep) ONLY so a genuinely ISOLATED C2-only diagnostic
+# (C3_ENABLE=false) is possible without touching bridge_master_slave.py's
+# own default. Every existing caller of this script that does not set
+# C3_ENABLE keeps the exact same behavior as before this variable existed.
+C3_ENABLE="${C3_ENABLE:-true}"
+# C1/C4 are not implemented by this bridge; these flags declare that the
+# supervised force relay is expected to be running so the bridge composes
+# bilateral_4ch.py's safety_state into the single /enable authority.
+C1_ENABLE="${C1_ENABLE:-false}"
+C4_ENABLE="${C4_ENABLE:-false}"
+BILATERAL_STATUS_TOPIC="${BILATERAL_STATUS_TOPIC:-/bilateral_status}"
+BILATERAL_STATUS_STALE_S="${BILATERAL_STATUS_STALE_S:-0.5}"
 # Force reflection: push back on the master when the slave meets a constraint.
 FORCE_REFLECT="${FORCE_REFLECT:-false}"
 REFLECT_GAIN="${REFLECT_GAIN:-18.0}"
@@ -182,10 +212,19 @@ exec python3 "${SCRIPT_DIR}/bridge_master_slave.py" \
   --absolute-axes "${ABSOLUTE_AXES}" \
   --absolute-trim-m "${ABSOLUTE_TRIM_M}" \
   --left-max-offset-m "${LEFT_MAX_OFFSET_M}" \
+  --c3-enable "${C3_ENABLE}" \
+  --c1-enable "${C1_ENABLE}" \
+  --c4-enable "${C4_ENABLE}" \
+  --bilateral-status-topic "${BILATERAL_STATUS_TOPIC}" \
+  --bilateral-status-stale-s "${BILATERAL_STATUS_STALE_S}" \
   --slave-gravity-comp-n "${SLAVE_GRAVITY_COMP_N}" \
   --slave-gravity-axis "${SLAVE_GRAVITY_AXIS}" \
   --left-gravity-comp-n "${LEFT_GRAVITY_COMP_N}" \
   --left-gravity-axis "${LEFT_GRAVITY_AXIS}" \
+  --master-stiffness-n-per-m "${MASTER_STIFFNESS_N_PER_M}" \
+  --master-damping-n-s-per-m "${MASTER_DAMPING_N_S_PER_M}" \
+  --master-max-force-n "${MASTER_MAX_FORCE_N}" \
+  --master-max-position-error-m "${MASTER_MAX_POSITION_ERROR_M}" \
   --max-speed-mps "${MAX_SPEED_MPS}" \
   --deadband-m "${DEADBAND_M}" \
   --rate-hz "${RATE_HZ}" \

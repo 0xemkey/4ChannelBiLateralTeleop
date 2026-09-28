@@ -1,0 +1,422 @@
+[
+  {
+    "w1": 0.3,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12393786707645527,
+    "shoulder_recv_nm": -0.0197905365483362,
+    "gain": 0.15968111292513804,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12407545324286949,
+    "shoulder_recv_nm": -0.019878186634367377,
+    "gain": 0.16021046963622324,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12403502860069143,
+    "shoulder_recv_nm": -0.0201466796722956,
+    "gain": 0.16242733927328082,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12399621386626403,
+    "shoulder_recv_nm": -0.020226802540118383,
+    "gain": 0.16312435605440323,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12389212394137931,
+    "shoulder_recv_nm": -0.019696330463085294,
+    "gain": 0.15897968197239715,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.3,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12403914123875433,
+    "shoulder_recv_nm": -0.03277152519163598,
+    "gain": 0.26420309641257794,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12393574866034483,
+    "shoulder_recv_nm": -0.03233922395055092,
+    "gain": 0.2609353983827457,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12423306671224832,
+    "shoulder_recv_nm": -0.03222527437918571,
+    "gain": 0.25939369631618836,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12384610710508182,
+    "shoulder_recv_nm": -0.03270903533983416,
+    "gain": 0.26411032291940323,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12436334204245282,
+    "shoulder_recv_nm": -0.03282104737917552,
+    "gain": 0.2639125552606305,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.5,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12400769065371331,
+    "shoulder_recv_nm": -0.04571285473621447,
+    "gain": 0.3686291914254403,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12413293840278988,
+    "shoulder_recv_nm": -0.04592091833877434,
+    "gain": 0.36993338697718503,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12378992679604132,
+    "shoulder_recv_nm": -0.046136779359952876,
+    "gain": 0.3727022105439058,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12406031232693984,
+    "shoulder_recv_nm": -0.04761269180421734,
+    "gain": 0.38378665111483995,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12389607128965519,
+    "shoulder_recv_nm": -0.04512973713499324,
+    "gain": 0.3642547876234506,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 0.7,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12400688435955057,
+    "shoulder_recv_nm": -0.06728733384830475,
+    "gain": 0.5426096639377628,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.1258637853575419,
+    "shoulder_recv_nm": -0.0677862089325605,
+    "gain": 0.5385680141432253,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12396498969921534,
+    "shoulder_recv_nm": -0.06708378314060116,
+    "gain": 0.5411510403330093,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.1252481995839861,
+    "shoulder_recv_nm": -0.06715831853446051,
+    "gain": 0.5362018676318537,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "shoulder_true_nm": 0.12385137236387207,
+    "shoulder_recv_nm": -0.06518846290221972,
+    "gain": 0.5263442920171908,
+    "sign_agree": true,
+    "waist_recv_diagnostic": 0.0,
+    "elbow_recv_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  },
+  {
+    "w1": 1.0,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "shoulder_p99_nm": 0.0,
+    "shoulder_rms_nm": 0.0,
+    "waist_p99_diagnostic": 0.0,
+    "elbow_p99_diagnostic": 0.0
+  }
+]

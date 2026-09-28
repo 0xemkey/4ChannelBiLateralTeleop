@@ -13,6 +13,7 @@ axis-mapping-unresolved-bug project memory).
 """
 from __future__ import annotations
 
+import subprocess
 import sys
 import tempfile
 import time
@@ -20,6 +21,7 @@ from pathlib import Path
 
 import pytest
 from geometry_msgs.msg import PoseStamped
+from touch_haptics.msg import BridgeDiagnostics
 
 sys.path.insert(0, str(Path(__file__).parent))
 from sim_common import LiveNode, ScriptProcess, SimNode, unique_ns  # noqa: E402
@@ -40,10 +42,18 @@ def test_c3_slave_target_tracks_master_position():
     # override, force_cmd is silently gated off (see test_c2_live.py's
     # matching comment for how that showed up).
     with SimNode(master_ns, device="Left",
+                # max_force_n/max_position_error_m overridden -- see
+                # test_c2_live.py's matching comment.
                 params={"stiffness_n_per_m": "15.0", "damping_n_s_per_m": "0.10",
+                       "max_force_n": "2.0", "max_position_error_m": "0.03",
                        "require_deadman": "false"}) as master, \
         SimNode(slave_ns, device="Default Device",
+                # max_force_n/max_position_error_m overridden to match the
+                # bridge's own --slave-max-force-n/--slave-max-position-
+                # error-m defaults (1.5N/0.04m) -- see test_c2_live.py's
+                # matching master-side comment.
                 params={"stiffness_n_per_m": "35.0", "damping_n_s_per_m": "0.20",
+                       "max_force_n": "1.5", "max_position_error_m": "0.04",
                        "require_deadman": "false"}) as slave:
 
         calib_path = Path(tempfile.mkstemp(suffix=".json")[1])
@@ -55,6 +65,13 @@ def test_c3_slave_target_tracks_master_position():
             "--right-pose-topic", slave.topic("pose"),
             "--right-target-topic", slave.topic("target_pose"),
             "--right-enable-topic", slave.topic("enable"),
+            # 2026-09-09 production-integration task: the bilateral force-
+            # budget planner (COUPLING_RAMP_UP) needs BOTH arms' telemetry
+            # to avoid holding alpha / faulting on stale telemetry -- must
+            # point at this test's own namespaced topics, not the (here,
+            # nonexistent) real-hardware default.
+            "--left-telemetry-topic", master.topic("cartesian_controller_telemetry"),
+            "--right-telemetry-topic", slave.topic("cartesian_controller_telemetry"),
             "--calibration-file", str(calib_path),
             "--axis-map", "x,y,z",
             "--rate-hz", "100",
@@ -64,13 +81,47 @@ def test_c3_slave_target_tracks_master_position():
         ) as bridge:
             bridge.wait_for_marker("teleoperation live", timeout=15.0)
 
+            # startup_alignment.py's READY->RAMPING->ACTIVE gate (added
+            # 2026-09-08, after this test was first written) blends C3's
+            # commanded target from right_anchor (frozen, zero relative
+            # motion) toward the real target only once armed -- without
+            # this, the target legitimately never moves regardless of how
+            # far the master is pushed, which is exactly what a 2026-09-09
+            # root-cause investigation found this test silently hitting
+            # (right_target frozen bit-for-bit at right_anchor for the
+            # entire test). This is the same one-line fix used throughout
+            # that investigation's own scripts. See
+            # docs/... (bridge/C2-C3 frame-mixing root-cause report) for
+            # the full trace -- this is a STALE TEST ASSUMPTION fix, not a
+            # bridge code change.
+            r = subprocess.run(
+                ["ros2", "param", "set", "/touch_master_slave_bridge", "arm_teleop", "true"],
+                capture_output=True, text=True, timeout=10)
+            assert "successful" in r.stdout, f"arm_teleop param set failed: {r.stdout} {r.stderr}"
+
             with LiveNode("c3_verify") as live:
                 live.watch("left_pose", master.topic("pose"), PoseStamped,
                           extract=lambda m: (m.pose.position.x, m.pose.position.y, m.pose.position.z))
                 live.watch("right_target", slave.topic("target_pose"), PoseStamped,
                           extract=lambda m: (m.pose.position.x, m.pose.position.y, m.pose.position.z))
+                live.watch("d", "/bridge_diagnostics", BridgeDiagnostics, extract=lambda x: x)
 
-                live.spin_for(3.0)
+                # Wait for ACTIVE (bridge_state), not a fixed spin_for(3.0) --
+                # 2026-09-09's velocity-gated GRAVITY_SETTLE (see
+                # startup_alignment.py) makes the total arm-sequence duration
+                # variable (waits for genuine mechanical quiescence, not a
+                # fixed clock), so the push-force comparison below must not
+                # assume a fixed schedule has completed by a fixed wall time.
+                deadline = time.time() + 15.0
+                while time.time() < deadline:
+                    live.spin_once(timeout_sec=0.01)
+                    d = live.latest.get("d")
+                    if d is not None and d.bridge_state == "ACTIVE":
+                        break
+                    if d is not None and d.bridge_state == "FAULT":
+                        raise AssertionError(f"bridge FAULTed while waiting for ACTIVE: {d}")
+                else:
+                    raise AssertionError("bridge never reached ACTIVE within 15s")
                 assert "left_pose" in live.latest, "no /pose from the master stand-in"
                 assert "right_target" in live.latest, "no C3 output on the slave's target_pose"
                 baseline_left = live.latest["left_pose"]

@@ -1,0 +1,722 @@
+[
+  {
+    "w4": 0.3,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012330163045495092,
+      0.06578780011596799,
+      0.07187767541034773
+    ],
+    "recv_vec": [
+      0.0,
+      0.00024161985425060454,
+      0.005330237317400608
+    ],
+    "gain": 0.0543260495372138,
+    "cos_sim": 0.7614107228796525
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012335843514461,
+      0.0657885897738826,
+      0.07187625338212086
+    ],
+    "recv_vec": [
+      0.0,
+      0.0002567215293343486,
+      0.00532598928344071
+    ],
+    "gain": 0.05428991635494518,
+    "cos_sim": 0.7632143135932608
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012326099004930167,
+      0.06578683106244869,
+      0.07187548300000007
+    ],
+    "recv_vec": [
+      0.0,
+      0.00031712605173087174,
+      0.005326331016901994
+    ],
+    "gain": 0.0543281135328983,
+    "cos_sim": 0.7703449240505647
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012334006259856633,
+      0.06578962298655919,
+      0.07187909098297474
+    ],
+    "recv_vec": [
+      0.0,
+      0.0002404237163582748,
+      0.005330333603880454
+    ],
+    "gain": 0.054324963502919064,
+    "cos_sim": 0.7612617568260384
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012345383197309417,
+      0.06578808150313904,
+      0.07187607148968594
+    ],
+    "recv_vec": [
+      0.0,
+      0.00024161985425060454,
+      0.005329617284077083
+    ],
+    "gain": 0.05431923061158197,
+    "cos_sim": 0.7613907026808776
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 0,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 1,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 2,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 3,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.3,
+    "run_idx": 4,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.01233466068671454,
+      0.06579200099371636,
+      0.0718803013393176
+    ],
+    "recv_vec": [
+      0.0,
+      0.00037753134142131333,
+      0.008871939625598001
+    ],
+    "gain": 0.09040736996646738,
+    "cos_sim": 0.7596328180712203
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012345383197309417,
+      0.06578808150313904,
+      0.07187607148968594
+    ],
+    "recv_vec": [
+      0.0,
+      0.0004026997570843409,
+      0.008882695473461806
+    ],
+    "gain": 0.09053205101930328,
+    "cos_sim": 0.7613907032620933
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012345383197309417,
+      0.06578808150313904,
+      0.07187607148968594
+    ],
+    "recv_vec": [
+      0.0,
+      0.0004026997570843409,
+      0.008882695473461806
+    ],
+    "gain": 0.09053205101930328,
+    "cos_sim": 0.7613907032620933
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012324948996415773,
+      0.06578962021774196,
+      0.07187909035125431
+    ],
+    "recv_vec": [
+      0.0,
+      0.0004047132558697626,
+      0.008881490008968018
+    ],
+    "gain": 0.09052010025017276,
+    "cos_sim": 0.7615646695297386
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.01232537050123255,
+      0.06579113196795404,
+      0.07188085512654074
+    ],
+    "recv_vec": [
+      0.0,
+      0.0005285434195514528,
+      0.008879576119161625
+    ],
+    "gain": 0.09056462236367785,
+    "cos_sim": 0.7703395641695823
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 0,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 1,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 2,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 3,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.5,
+    "run_idx": 4,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.01233023028290063,
+      0.06578876800537158,
+      0.07187667015666949
+    ],
+    "recv_vec": [
+      0.0,
+      0.0006342527336260269,
+      0.012424420283702525
+    ],
+    "gain": 0.12666524594544967,
+    "cos_sim": 0.7650179408798274
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012325791448924733,
+      0.06578962171594985,
+      0.0718790908198923
+    ],
+    "recv_vec": [
+      0.0,
+      0.0005637796599180773,
+      0.012435773662846527
+    ],
+    "gain": 0.12674386402233745,
+    "cos_sim": 0.7614160714797292
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012335431653044217,
+      0.06578739111926607,
+      0.07187439036447042
+    ],
+    "recv_vec": [
+      0.0,
+      0.0007399610007083087,
+      0.012429555539562659
+    ],
+    "gain": 0.12677936972785167,
+    "cos_sim": 0.7703239818036258
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012329272009016406,
+      0.06579126613114757,
+      0.07187997600327876
+    ],
+    "recv_vec": [
+      0.0,
+      0.000739960787372034,
+      0.012432853612418063
+    ],
+    "gain": 0.126805260333579,
+    "cos_sim": 0.7703268957265248
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012325791448924733,
+      0.06578962171594985,
+      0.0718790908198923
+    ],
+    "recv_vec": [
+      0.0,
+      0.0005637796599180773,
+      0.012435773662846527
+    ],
+    "gain": 0.12674386402233745,
+    "cos_sim": 0.7614160714797292
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 0,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 1,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 2,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 3,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 0.7,
+    "run_idx": 4,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 0,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012329357168912846,
+      0.06578816072327047,
+      0.07187690876909238
+    ],
+    "recv_vec": [
+      0.0,
+      0.0008557373177371128,
+      0.017763321359669862
+    ],
+    "gain": 0.18106947368224255,
+    "cos_sim": 0.7632083648177563
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 1,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012336228094170404,
+      0.06578926275156954,
+      0.07187873476591912
+    ],
+    "recv_vec": [
+      0.0,
+      0.0008053989916859717,
+      0.017765391399431205
+    ],
+    "gain": 0.1810611753900102,
+    "cos_sim": 0.7614059916982104
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 2,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012336228094170404,
+      0.06578926275156954,
+      0.07187873476591912
+    ],
+    "recv_vec": [
+      0.0,
+      0.0008053995141686819,
+      0.01776539094692361
+    ],
+    "gain": 0.18106117102852307,
+    "cos_sim": 0.7614060110973643
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 3,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.012334006259856633,
+      0.06578962298655919,
+      0.07187909098297474
+    ],
+    "recv_vec": [
+      0.0,
+      0.0008053995141686819,
+      0.01776539094692361
+    ],
+    "gain": 0.18106076004052105,
+    "cos_sim": 0.761408071933072
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 4,
+    "condition": "contact",
+    "oscillation_abort": false,
+    "true_vec": [
+      -0.0123266310951526,
+      0.0657893289694794,
+      0.07187919010951509
+    ],
+    "recv_vec": [
+      0.0,
+      0.0008557373177371128,
+      0.017765390213727025
+    ],
+    "gain": 0.18108662345374138,
+    "cos_sim": 0.7632121947423922
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 0,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 1,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 2,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 3,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 4,
+    "condition": "free_motion",
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 0,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 1,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 2,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 3,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  },
+  {
+    "w4": 1.0,
+    "run_idx": 4,
+    "condition": "active_motion",
+    "oscillation_abort": false,
+    "rms_nm": 0.0,
+    "p99_nm": 0.0,
+    "peak_nm": 0.0,
+    "frac_nonzero": 0.0
+  }
+]

@@ -74,6 +74,18 @@ from touch_haptics.msg import BilateralStatus, ForceEstimate
 JOINTS = ("waist", "shoulder", "elbow")
 
 # C1, C2, C3, C4
+#
+# BASELINE / LEGACY COMMISSIONING VALUES -- NOT SCIENTIFIC OPTIMA.
+# "4ch_safe"'s 0.5/0.3 (C1/C4) in particular were never derived from a
+# defined transparency objective, sweep, or optimization run -- no such
+# evidence exists anywhere in this repo (see
+# docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md's C1/C4 weight
+# entries, classified ARBITRARY / BASELINE_ONLY). They are conservative
+# starting points used during hardware bring-up, kept unchanged here
+# per this task's explicit instruction not to invent replacement gains.
+# Any future gain optimization (Scientific design process Phase 6) must
+# treat every value below as a baseline point to compare against, not a
+# validated target.
 PRESETS = {
     "unilateral": (0.0, 0.0, 1.0, 0.0),
     "pp": (0.0, 1.0, 1.0, 0.0),
@@ -215,6 +227,20 @@ class BilateralController(Node):
         self.weights: List[float] = list(target)  # ramped state, starts at target
         self.architecture = args.architecture
 
+        # SAFETY_ONLY / LEGACY_COMMISSIONING_PRESET, not a scientific default:
+        # --c1-disable-joints defaults to "shoulder" (see its argparse help
+        # below) because shoulder's DOB noise floor was found to meet or
+        # exceed its own torque budget on THIS specific hardware (measured,
+        # touch_slave.cpp's kGDis/kThreshold comment). That is a per-rig
+        # commissioning finding, not a property of the ideal scientific
+        # 4-channel controller, which is architecturally capable of relaying
+        # all 3 joints (waist, shoulder, elbow) -- pass --c1-disable-joints=""
+        # to run the full 3-joint path once shoulder's estimator is
+        # separately improved or a graded (non-hard-mask) alternative is
+        # adopted; see docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md's
+        # shoulder-mask entry for the untried graded alternatives. The
+        # default value itself is NOT changed here -- doing so would require
+        # a REQUIRES_USER_DECISION per docs/SCIENTIFIC_4CH_DESIGN_PROCESS.md.
         disabled = {
             name.strip() for name in args.c1_disable_joints.split(",") if name.strip()
         }
@@ -280,32 +306,44 @@ class BilateralController(Node):
         self.status_pub = self.create_publisher(
             BilateralStatus, args.status_topic, 20)
 
-        # C1/C4 REAL BUG, fixed 2026-09-07: the Cartesian relay block in
-        # touch_slave.cpp (both master and slave) is gated on
-        # `command.enabled`, the SAME flag /enable controls -- with nothing
-        # else running, this stays false forever (enabled_on_start_ defaults
-        # false, and neither run_master_left.sh nor run_slave_right.sh ever
-        # sets it). bridge_master_slave.py already publishes the SLAVE's own
-        # /enable unconditionally whenever C3 is armed, so C4 (into the
-        # slave) was never affected -- but the MASTER's /enable is published
-        # ONLY when the bridge runs with --enable-c2 or --reflect-enable,
-        # neither of which this script requires. Without one of those, C1
-        # silently did nothing on real hardware regardless of weight --
-        # confirmed live: same class of defect as the applied_force
-        # telemetry bug found the same week (a real precondition, not
-        # obviously visible from this script's own code). This script is
-        # exactly the node responsible for getting C1/C4 onto these
-        # devices, so it now ensures its own precondition rather than
-        # requiring a separate manual publisher per side. `command.enabled`
-        # has no staleness/timeout (touch_slave.cpp's enableCallback just
-        # latches the last value), so a low-rate publish is enough, but this
-        # publishes every tick to match bridge_master_slave.py's own
-        # existing convention and to self-heal if the receiving node
-        # restarts mid-session.
-        self.left_enable_pub = self.create_publisher(
-            Bool, args.left_enable_topic, 10)
-        self.right_enable_pub = self.create_publisher(
-            Bool, args.right_enable_topic, 10)
+        # C1/C4 REAL BUG, fixed 2026-09-07, SUPERSEDED 2026-09-10: the
+        # Cartesian relay block in touch_slave.cpp (both master and slave)
+        # is gated on `command.enabled` -- with nothing else running, this
+        # stayed false forever, so C1 (needing the MASTER's own /enable,
+        # which the bridge only published when --enable-c2 or
+        # --reflect-enable was also on) silently did nothing. The 2026-09-07
+        # fix was for THIS script to publish /enable itself -- but that
+        # created a SECOND, INDEPENDENT publisher on the same topic as
+        # bridge_master_slave.py's own (with completely different
+        # arm/deadman/FAULT logic), a real safety gap documented in
+        # CHANNEL_READINESS_MATRIX.md and blocking H7-H9.
+        #
+        # 2026-09-10 command-authority ADR: bridge_master_slave.py now
+        # publishes ITS OWN /touch_left/enable UNCONDITIONALLY (not just
+        # when C2/reflect is on) -- see its left_enable_pub construction
+        # comment -- which closes the ORIGINAL 2026-09-07 precondition gap
+        # at the source, without this script needing to publish enable at
+        # all when co-launched with the bridge (the normal, supervised
+        # case). --publish-enable (default FALSE) exists ONLY for the
+        # legacy/standalone case of running this script with NO bridge
+        # present at all (e.g. a bare joint-space-only rig, not this
+        # project's current architecture) -- it must stay False whenever
+        # bridge_master_slave.py is also running, or the same dual-
+        # publisher conflict returns.
+        self.publish_enable = args.publish_enable
+        self.left_enable_pub = None
+        self.right_enable_pub = None
+        if self.publish_enable:
+            self.get_logger().warn(
+                "--publish-enable is TRUE: this node will publish its own /enable, "
+                "independent of bridge_master_slave.py's arm/deadman/FAULT state. "
+                "Only use this for a standalone run with NO bridge co-launched -- "
+                "see this constructor's own comment."
+            )
+            self.left_enable_pub = self.create_publisher(
+                Bool, args.left_enable_topic, 10)
+            self.right_enable_pub = self.create_publisher(
+                Bool, args.right_enable_topic, 10)
 
         # Manual re-arm: `ros2 param set /bilateral_4ch manual_rearm true`.
         # Consumed and reset to false the instant it clears a trip, so it
@@ -419,26 +457,31 @@ class BilateralController(Node):
         w2_eff = self.weights[1]
         w3_eff = self.weights[2]
 
-        # See the constructor comment above self.left_enable_pub: C1 cannot
-        # reach the master, and C4 cannot reach the slave, unless that
-        # node's own command.enabled is true. Tied to the TARGET weight
-        # (self.weights, pre-trip/pre-tank), not w1_eff/w4_eff -- enable
-        # should stay true through a ramp-down or a trip (which should zero
-        # the relayed FORCE, not silently disable the device for whatever
-        # else might legitimately want it enabled), matching how
-        # bridge_master_slave.py never toggles the slave's enable off just
-        # because tracking is momentarily degraded.
-        enable_msg = Bool()
-        enable_msg.data = self.target_weights[0] > 0.0
-        self.left_enable_pub.publish(enable_msg)
-        enable_msg2 = Bool()
-        enable_msg2.data = self.target_weights[3] > 0.0
-        self.right_enable_pub.publish(enable_msg2)
+        # 2026-09-10: only publishes if --publish-enable was explicitly set
+        # (legacy/standalone use, no bridge co-launched) -- see the
+        # constructor comment above self.publish_enable for why this is now
+        # bridge_master_slave.py's job in the normal, supervised case.
+        if self.publish_enable:
+            enable_msg = Bool()
+            enable_msg.data = self.target_weights[0] > 0.0
+            self.left_enable_pub.publish(enable_msg)
+            enable_msg2 = Bool()
+            enable_msg2.data = self.target_weights[3] > 0.0
+            self.right_enable_pub.publish(enable_msg2)
 
         # ---- C1: slave contact torque -> master ----
+        # SIGN: -w1 (opposing/reactive convention, F_m ~= -F_s), matching this
+        # file's own docstring above and confirmed as the project's decided
+        # scientific target 2026-09-08. Prior to this fix the code carried NO
+        # negation here (a same-direction/mirror relay), confirmed via
+        # simulation ground truth to disagree with that target -- see
+        # docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md and
+        # analysis/scientific_4ch/test_c1_sign_vs_ground_truth.py. This
+        # correction is simulation-validated only; REQUIRES_FUTURE_HARDWARE_VALIDATION
+        # before use on physical devices.
         tau_e_hat = list(self.right_fe.tau_ext_deadbanded_nm) if right_fe_valid else [0.0, 0.0, 0.0]
         tau_c1 = [
-            w1_eff * self.args.cf * v * m for v, m in zip(tau_e_hat, self.c1_joint_mask)
+            -w1_eff * self.args.cf * v * m for v, m in zip(tau_e_hat, self.c1_joint_mask)
         ]
 
         # ---- C4: master hand torque -> slave ----
@@ -603,6 +646,7 @@ class BilateralController(Node):
         # this script has no visibility into. Documented, not measured.
         msg.master_torque_cmd_nm = [float(v) for v in tau_c1]
         msg.slave_torque_cmd_nm = [float(v) for v in tau_c4]
+        msg.c1_joint_mask = [float(m) for m in self.c1_joint_mask]
 
         msg.master_budget_used = max(
             (abs(tau_c1[i]) / MAX_TORQUE_NM[i] for i in range(3)), default=0.0)
@@ -630,6 +674,13 @@ class BilateralController(Node):
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    # ---- PERFORMANCE CONTROLLER (transparency tuning, NOT safety) ----
+    # Everything in this block trades off transparency/performance and is a
+    # BASELINE / LEGACY value, not a validated scientific optimum -- see
+    # docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md. Do not read a
+    # default here as "the correct value"; changing these cannot violate a
+    # hard safety limit (the SAFETY ENVELOPE block further down is what
+    # actually protects the operator/hardware regardless of these choices).
     p.add_argument("--architecture", default="pp",
                    help=f"one of {sorted(PRESETS)} or 'custom' (use --w1..--w4)")
     p.add_argument("--w1", type=float, default=0.0, help="C1 weight, custom architecture only")
@@ -641,13 +692,19 @@ def parse_args() -> argparse.Namespace:
                         "devices at 1:1 scaling; any other value breaks power conservation "
                         "and must be a deliberate, documented choice (plan Sec 2.1).")
     p.add_argument("--c1-disable-joints", default="shoulder",
-                   help="Comma-separated joint names (from waist,shoulder,elbow) whose C1 "
+                   help="SAFETY_ONLY / LEGACY_COMMISSIONING_PRESET, not a scientific "
+                        "default -- the ideal 3-joint controller supports relaying all of "
+                        "waist,shoulder,elbow; this default reflects a per-rig commissioning "
+                        "finding, not a design decision about the controller itself. "
+                        "Comma-separated joint names (from waist,shoulder,elbow) whose C1 "
                         "contribution is forced to zero before weighting/relay. Default "
                         "excludes shoulder: the right-arm DOB replay verification found its "
                         "noise/friction floor meets or exceeds its own torque budget at every "
                         "filter cutoff tested (2026-09-01), so its force_ext_hat is not fit "
                         "for relaying to the master. Waist and elbow have workable headroom. "
-                        "Pass '' to relay all three once/if the shoulder fit is fixed.")
+                        "Pass '' to relay all three once/if the shoulder fit is fixed, or once "
+                        "a graded (non-hard-mask) alternative replaces this preset -- see "
+                        "docs/SCIENTIFIC_CONTROLLER_ASSUMPTION_REGISTER.md.")
 
     p.add_argument("--left-force-topic", default="/touch_left/force_ext_hat")
     p.add_argument("--right-force-topic", default="/touch_right/force_ext_hat")
@@ -657,20 +714,35 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--right-joint-target-topic", default="/touch_right/joint_target")
     p.add_argument("--left-joint-torque-ext-topic", default="/touch_left/joint_torque_ext_cmd")
     p.add_argument("--right-joint-torque-ext-topic", default="/touch_right/joint_torque_ext_cmd")
+    p.add_argument("--publish-enable", action="store_true", default=False,
+                   help="2026-09-10: OFF by default. If true, this node publishes its own "
+                        "/enable for both arms (the pre-2026-09-10 behavior) -- ONLY use "
+                        "this for a standalone run with NO bridge_master_slave.py "
+                        "co-launched. When the bridge IS running (the normal, supervised "
+                        "case), it now publishes /touch_left/enable and /touch_right/enable "
+                        "unconditionally itself, so this script does not need to -- leaving "
+                        "this default False, which avoids the dual-publisher conflict "
+                        "documented in CHANNEL_READINESS_MATRIX.md.")
     p.add_argument("--left-enable-topic", default="/touch_left/enable",
-                   help="Published true whenever w1>0 (C1 needs the master's own "
-                        "command.enabled to write the relayed Cartesian force). "
-                        "Same topic bridge_master_slave.py's --enable-c2/--reflect-enable "
-                        "would otherwise publish -- this script no longer depends on either.")
+                   help="Only used if --publish-enable is set (see its help).")
     p.add_argument("--right-enable-topic", default="/touch_right/enable",
-                   help="Published true whenever w4>0. Usually redundant with the "
-                        "position bridge's own unconditional slave enable, kept for when "
-                        "this script runs without that bridge (e.g. sim tests).")
+                   help="Only used if --publish-enable is set (see its help).")
     p.add_argument("--status-topic", default="/bilateral_status")
 
     p.add_argument("--rate-hz", type=float, default=200.0,
                    help="Must be >= the slower node's stale_timeout_s^-1 or channels will "
                         "read STALE between ticks.")
+
+    # ---- SAFETY ENVELOPE (hard mechanisms, NOT tuning parameters) ----
+    # stale-timeout-s, the energy tank, and the oscillation-abort trip below
+    # exist to bound risk regardless of how the PERFORMANCE CONTROLLER block
+    # above is configured -- they are not part of the scientific transparency
+    # objective and must not be treated as gains to optimize for better
+    # "feel". Their specific numeric values are themselves still
+    # ARBITRARY/not-derived-from-a-passivity-margin (see the assumption
+    # register), but the MECHANISM (some hard bound must exist) is a
+    # genuine safety requirement, not a design preference -- this task's
+    # own rules forbid weakening any of it, and nothing below was changed.
     p.add_argument("--stale-timeout-s", type=float, default=0.1)
     p.add_argument("--ramp-time-s", type=float, default=0.5,
                    help="Full-scale weight ramp time. A step in w1 is a step force into a hand.")

@@ -1,0 +1,211 @@
+{
+  "H3_forward_tracking": {
+    "X": {
+      "rmse_mm": 9.69,
+      "mae_mm": 8.05,
+      "mean_signed_mm": 0.59,
+      "peak_mm": 20.47,
+      "p95_mm": 15.89,
+      "reach_ratio": 0.918
+    },
+    "Y": {
+      "rmse_mm": 10.02,
+      "mae_mm": 9.32,
+      "mean_signed_mm": 4.57,
+      "peak_mm": 20.34,
+      "p95_mm": 15.96,
+      "reach_ratio": 0.975
+    },
+    "Z": {
+      "rmse_mm": 8.81,
+      "mae_mm": 7.45,
+      "mean_signed_mm": 5.82,
+      "peak_mm": 26.62,
+      "p95_mm": 15.6,
+      "reach_ratio": 0.896
+    }
+  },
+  "H5_cross_axis": {
+    "X": {
+      "RMS(y)/RMS(x)": 0.113,
+      "RMS(z)/RMS(x)": 0.197
+    },
+    "Y": {
+      "RMS(x)/RMS(y)": 0.085,
+      "RMS(z)/RMS(y)": 0.441
+    },
+    "Z": {
+      "RMS(x)/RMS(z)": 0.141,
+      "RMS(y)/RMS(z)": 0.518
+    }
+  },
+  "H6_dob_contamination": {
+    "X": {
+      "waist": {
+        "corr_with_qdot": 0.109,
+        "corr_with_qddot": -0.06,
+        "corr_with_position": -0.357,
+        "fe_std": 0.00261
+      },
+      "shoulder": {
+        "corr_with_qdot": 0.0,
+        "corr_with_qddot": 0.0,
+        "corr_with_position": 0.0,
+        "fe_std": 0.0
+      },
+      "elbow": {
+        "corr_with_qdot": 0.0,
+        "corr_with_qddot": 0.0,
+        "corr_with_position": 0.0,
+        "fe_std": 0.0
+      }
+    },
+    "Y": {
+      "waist": {
+        "corr_with_qdot": 0.0,
+        "corr_with_qddot": 0.0,
+        "corr_with_position": 0.0,
+        "fe_std": 0.0
+      },
+      "shoulder": {
+        "corr_with_qdot": 0.0,
+        "corr_with_qddot": 0.0,
+        "corr_with_position": 0.0,
+        "fe_std": 0.0
+      },
+      "elbow": {
+        "corr_with_qdot": 0.021,
+        "corr_with_qddot": 0.003,
+        "corr_with_position": -0.129,
+        "fe_std": 0.00204
+      }
+    },
+    "Z": {
+      "waist": {
+        "corr_with_qdot": -0.164,
+        "corr_with_qddot": -0.019,
+        "corr_with_position": -0.11,
+        "fe_std": 0.00137
+      },
+      "shoulder": {
+        "corr_with_qdot": 0.245,
+        "corr_with_qddot": 0.022,
+        "corr_with_position": -0.485,
+        "fe_std": 0.0016
+      },
+      "elbow": {
+        "corr_with_qdot": 0.0,
+        "corr_with_qddot": 0.0,
+        "corr_with_position": 0.0,
+        "fe_std": 0.0
+      }
+    }
+  },
+  "H6_classification": {
+    "X": {
+      "waist": "MODERATE",
+      "shoulder": "LOW",
+      "elbow": "LOW"
+    },
+    "Y": {
+      "waist": "LOW",
+      "shoulder": "LOW",
+      "elbow": "LOW"
+    },
+    "Z": {
+      "waist": "LOW",
+      "shoulder": "MODERATE",
+      "elbow": "LOW"
+    }
+  },
+  "H8_shoulder_mask_impact": {
+    "X": {
+      "x": {
+        "rms_masked_n": 0.00548,
+        "rms_hypothetical_unmasked_n": 0.01097,
+        "pct_change": 100.0
+      },
+      "y": {
+        "rms_masked_n": 0.0,
+        "rms_hypothetical_unmasked_n": 0.07769,
+        "pct_change": null
+      },
+      "z": {
+        "rms_masked_n": 0.00356,
+        "rms_hypothetical_unmasked_n": 0.0275,
+        "pct_change": 672.6
+      }
+    },
+    "Y": {
+      "x": {
+        "rms_masked_n": 3e-05,
+        "rms_hypothetical_unmasked_n": 0.01193,
+        "pct_change": 36148.7
+      },
+      "y": {
+        "rms_masked_n": 0.00724,
+        "rms_hypothetical_unmasked_n": 1.18807,
+        "pct_change": 16321.1
+      },
+      "z": {
+        "rms_masked_n": 0.0034,
+        "rms_hypothetical_unmasked_n": 1.49852,
+        "pct_change": 44034.5
+      }
+    },
+    "Z": {
+      "x": {
+        "rms_masked_n": 0.00392,
+        "rms_hypothetical_unmasked_n": 0.00471,
+        "pct_change": 20.0
+      },
+      "y": {
+        "rms_masked_n": 0.0,
+        "rms_hypothetical_unmasked_n": 0.04668,
+        "pct_change": null
+      },
+      "z": {
+        "rms_masked_n": 0.00045,
+        "rms_hypothetical_unmasked_n": 0.03403,
+        "pct_change": 7407.7
+      }
+    }
+  },
+  "H9_clamps_condA": {
+    "X": {
+      "master_travel_limit_flag": 23.0,
+      "slave_travel_limit_flag": 10.33,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 0.0
+    },
+    "Y": {
+      "master_travel_limit_flag": 54.33,
+      "slave_travel_limit_flag": 0.0,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 0.33
+    },
+    "Z": {
+      "master_travel_limit_flag": 11.56,
+      "slave_travel_limit_flag": 0.0,
+      "master_force_saturation_flag": 0.0,
+      "slave_force_saturation_flag": 0.0
+    }
+  },
+  "H10_gating_frequency": {
+    "X": {
+      "n_transitions": 45,
+      "duration_s": 19.99,
+      "transitions_per_s": 2.25
+    },
+    "Y": {
+      "n_transitions": 140,
+      "duration_s": 19.99,
+      "transitions_per_s": 7.0
+    },
+    "Z": {
+      "n_transitions": 70,
+      "duration_s": 19.99,
+      "transitions_per_s": 3.5
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0.0",
+  "created_utc": "2026-09-10T15:38:21Z",
+  "channel": "C1",
+  "session": "20260910T153620Z_c1only_c1_qualification",
+  "trial_dir": "/home/nural/HIL-RL/experiment_runs/teleop_setup/20260910T153620Z_c1only_c1_qualification/manual_motion/c1_qualification",
+  "validation": {
+    "overall_result": "VALID",
+    "flags": [],
+    "channel_isolation": {
+      "configured": {
+        "c1": true,
+        "c2": false,
+        "c3": false,
+        "c4": false
+      },
+      "expected": {
+        "c1": true,
+        "c2": false,
+        "c3": false,
+        "c4": false
+      },
+      "configured_matches_expected": true,
+      "live_channel_active_available": true,
+      "unexpected_activation": null,
+      "missing_expected_activation": null
+    },
+    "thresholds_used": {
+      "telemetry_stale_s": 0.2,
+      "noise_band_m": 0.0005,
+      "motion_threshold_m": 0.001,
+      "min_excitation_m": 0.001
+    },
+    "thresholds_not_defined": [
+      "excessive_signal_dropout_count (no frozen threshold exists)",
+      "excessive_cross_axis_motion_ratio (no frozen threshold exists)",
+      "master_deadman_loss_during_force_stage (deadman_ok tracked per-sample in raw_master.csv; no frozen minimum-hold-fraction threshold exists)"
+    ]
+  },
+  "metrics_summary": {
+    "analysis_direction": "c1",
+    "source_role": "slave",
+    "follower_role": "master",
+    "source_peak_y_m": 0.08198272705078125,
+    "follower_peak_y_m": -0.00016453552246094294,
+    "positive_motion_gain": -0.0020069535178919742,
+    "force_dob": {
+      "result": "EVALUATED",
+      "master_peak_applied_force_n_y": 0.7321390871888503,
+      "slave_peak_applied_force_n_y": 0.08056580963134752,
+      "master_final_force_clamp_seen": false,
+      "slave_final_force_clamp_seen": false
+    }
+  },
+  "manifest_expected_channel_configuration": {
+    "c1": true,
+    "c2": false,
+    "c3": false,
+    "c4": false
+  }
+}

@@ -4,6 +4,16 @@ Reference: "Learning Contact for Haptic Feedback: Switching X-lateral
 Teleoperators" (Yilmaz & Tumerdem, ICRA 2024). Produced before any code
 edit, per the 2026-09-07 diagnose-and-repair task's explicit requirement.
 
+> **UPDATE 2026-09-08**: row #10 below and its code excerpt at §2 describe
+> `tau_c1 = w1*Cf*tau_e_hat*mask` (no negation) as traced at the time this
+> document was written. That has since been identified as a sign
+> discrepancy against this project's own decided scientific target
+> (`F_m ≈ -F_s`), confirmed via simulation ground truth, and corrected to
+> `tau_c1 = -w1*Cf*tau_e_hat*mask` on branch `c1-sign-fix-sim-validation`.
+> See `docs/SCIENTIFIC_SIGN_FRAME_AUDIT.md` for the full trace and
+> validation. The excerpts below are left as originally written (a
+> point-in-time trace); do not use them as the current sign reference.
+
 ## 0. The nomenclature mismatch, precisely (not just "they differ")
 
 The paper's own equations (10)-(13) define, for master control law `Fcm`
