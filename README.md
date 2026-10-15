@@ -5,20 +5,15 @@ system, assembled 2026-09-04 so this project can be built and run on a
 different computer (same physical Touch/Omni devices) without depending on
 anything else in the original `HIL-RL` repository.
 
-**Status as of this branch (`hardware-testing-2026-09`, 2026-09-07):** a
-startup/alignment state machine (`scripts/startup_alignment.py`) now gates
-every session — anchors are captured and validated automatically before
-teleoperation goes live, instead of the old "first message wins" capture.
-C2+C3 (position, both directions) and, separately, all four channels
-(C1+C2+C3+C4) together have been re-confirmed on real hardware today,
-2026-09-07 — see `07.09.2026 trials/fourchannel_graphs/` for that
-session's raw CSV and plots (position, force, per-channel tracking error,
-alignment error). **C1/C4 (the force-relay channels) are gated off by
-default** — `experiment_launch/04_start_force_relay.sh` deliberately
-refuses to run pending a formal separability qualification (Phase 2.7,
-see `FOUR_CHANNEL_TODO.md`'s roadmap); today's C1/C4 session ran by
-invoking `bilateral_4ch.py` directly, bypassing that gate as a deliberate,
-informed choice — do the same only if you understand why the gate exists.
+**Current status:** the repository contains the startup/alignment state
+machine, supervised command authority, C1/C4 relay safety gates, and
+hardware-validation tooling. Older trial directories are historical evidence,
+not qualification of the current checkout. Read
+`projects/teleop_left_master_right_slave/validation_provenance/CURRENT_READINESS.md`
+for the current channel-by-channel status and required H0–H9 validation order.
+The corrected C1 sign and the current C4 path still require fresh controlled
+hardware validation before unsupervised use. Direct real-device joint-torque
+writing remains disabled by default.
 
 **Read `projects/teleop_left_master_right_slave/docs/SYSTEM_ARCHITECTURE.pdf`
 first** if you want to understand *how* the system works (channel
@@ -164,7 +159,7 @@ omit the flag entirely if it's on the default system paths).
 |---|---|---|
 | `TOUCH_HAPTICS_BUILD_SIM` | `ON` | builds `touch_slave_sim` + the simulator library — works with no real devices attached |
 | `TOUCH_HAPTICS_BUILD_HW` | `ON` | builds the real-hardware `touch_slave`/`touch_publisher` — requires OpenHaptics to actually be found, else this silently drops to `OFF` with a warning |
-| `TOUCH_HAPTICS_ENABLE_REAL_TORQUE_WRITE` | `OFF` | **safety gate.** Only when explicitly `ON` can the real `touch_slave` binary write joint torque (C1/C4's relay path) to real motors via `joint_space_control:=true`. Leave `OFF` unless you specifically intend to test that path, and confirm `dob_torque_f_max_n` is set low with an e-stop ready first — see the CMake warning it prints when enabled. |
+| `TOUCH_HAPTICS_ENABLE_REAL_TORQUE_WRITE` | `OFF` | **safety gate for a separate experimental path.** Only when explicitly `ON` can the real `touch_slave` binary write joint torque to real motors via `joint_space_control:=true`. The supervised C1/C4 relay converts joint relay torque to Cartesian force and uses `HD_CURRENT_FORCE`; it does not require this option. Leave this option `OFF` unless you specifically intend to qualify direct joint-torque writing, and confirm `dob_torque_f_max_n` is set low with an e-stop ready first — see the CMake warning it prints when enabled. |
 
 After building:
 ```bash

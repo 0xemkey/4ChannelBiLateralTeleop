@@ -15,6 +15,15 @@ RIGHT_CFG="${HOME}/.3dsystems/config/Default Device.config"
 source_ros
 command -v ros2 >/dev/null || { echo "[preflight][error] ros2 unavailable" >&2; exit 1; }
 command -v python3 >/dev/null || { echo "[preflight][error] python3 unavailable" >&2; exit 1; }
+GIT_COMMIT="$(git -C "${REPO_ROOT}" rev-parse --verify HEAD 2>/dev/null || printf '%s' 'UNKNOWN')"
+GIT_BRANCH="$(git -C "${REPO_ROOT}" symbolic-ref --short -q HEAD 2>/dev/null || printf '%s' 'DETACHED_OR_UNKNOWN')"
+if [[ "$(git -C "${REPO_ROOT}" status --porcelain 2>/dev/null)" == "" ]]; then
+  GIT_WORKTREE_CLEAN=true
+else
+  GIT_WORKTREE_CLEAN=false
+fi
+[[ "${GIT_COMMIT}" != "UNKNOWN" ]] || {
+  echo "[preflight][error] repository provenance unavailable: ${REPO_ROOT}" >&2; exit 1; }
 [[ -x "${TOUCH_WS}/install/touch_haptics/lib/touch_haptics/touch_slave" ]] || {
   echo "[preflight][error] touch_slave executable missing" >&2; exit 1; }
 for f in "${LEFT_INERTIA}" "${LEFT_GRAVITY}" "${RIGHT_INERTIA}" "${RIGHT_GRAVITY}" "${LEFT_CFG}" "${RIGHT_CFG}"; do
@@ -43,6 +52,7 @@ if [[ -f "${current_file}" ]]; then
 fi
 
 echo "[preflight] session=${SESSION_ID} mode=${CONTROLLER_MODE} output=${SESSION_DIR}"
+echo "[preflight] git=${GIT_COMMIT} branch=${GIT_BRANCH} worktree_clean=${GIT_WORKTREE_CLEAN}"
 echo "[preflight] master=Left (channel 300, /dev/ttyACM300, usb-0:10.1); slave=Default Device (channel 301, /dev/ttyACM301, usb-0:10.2)"
 echo "[preflight] startup is ZERO-FORCE: joint_space_control=false, enabled_on_start=false, C1=C2=C3=C4=0"
 echo "[preflight] DOB observation: left enabled; right explicitly enabled; no DOB output is applied"
@@ -59,6 +69,8 @@ mkdir -p "${PID_DIR}" "${LOG_DIR}"
   printf 'SESSION_ID=%q\n' "${SESSION_ID}"
   printf 'SESSION_DIR=%q\n' "${SESSION_DIR}"
   printf 'CREATED_AT=%q\n' "$(date --iso-8601=seconds)"
+  printf 'GIT_COMMIT=%q\nGIT_BRANCH=%q\nGIT_WORKTREE_CLEAN=%q\n' \
+    "${GIT_COMMIT}" "${GIT_BRANCH}" "${GIT_WORKTREE_CLEAN}"
   printf 'CONTROLLER_MODE=%q\n' "${CONTROLLER_MODE}"
   printf 'OPERATOR_NOTES=%q\n' "${OPERATOR_NOTES}"
   printf 'ROS_DOMAIN_ID=%q\n' "${ROS_DOMAIN_ID:-0}"

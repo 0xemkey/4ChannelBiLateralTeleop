@@ -14,13 +14,13 @@ reuses it and adds only an opt-in telemetry parameter.
 projects/teleop_left_master_right_slave/
   README.md                      this file
   RUNNING_SCRIPTS.txt            copy-paste commands
-  docs/FOUR_CHANNEL_TODO.md      single source of truth for C1-C4 status
+  validation_provenance/CURRENT_READINESS.md  current C1-C4 readiness snapshot
   scripts/run_master_left.sh     terminal 1, left device as master
   scripts/run_bridge.sh          terminal 2, master deltas to slave targets
                                   (+ calibration, + optional C2)
   scripts/run_slave_right.sh     terminal 3, right device as force slave
   scripts/bridge_master_slave.py the bridge node itself (C2/C3)
-  scripts/bilateral_4ch.py       the 4-channel node (C1/C4), sim-only for now
+  scripts/bilateral_4ch.py       the 4-channel node (C1/C4), relay-only in hardware mode
   scripts/read_calibration.py    reads the bridge's calibration file
   scripts/monitor_forces.sh      live force on both arms, side by side
   scripts/monitor_forces.py      the monitor node
@@ -29,20 +29,13 @@ projects/teleop_left_master_right_slave/
 
 ## Channel status (C1-C4)
 
-This project's target architecture is 4-channel bilateral teleoperation.
-As of 2026-09-03:
-
-| | channel | status |
-|---|---|---|
-| C1 | slave force -> master | sim-confirmed (`bilateral_4ch.py`), never run on real hardware |
-| C2 | slave position -> master | **confirmed on real hardware** (`--enable-c2`) -- needed `LEFT_GRAVITY_COMP_N`/`LEFT_MAX_OFFSET_M` tuned live, not yet swept |
-| C3 | master position -> slave | **confirmed on real hardware** -- this is what the rest of this README describes |
-| C4 | master force -> slave | sim-only, not yet passing its own tracking test |
-
-Full detail, evidence, and the real-hardware test plans for C1/C2/C4 are in
-[docs/FOUR_CHANNEL_TODO.md](docs/FOUR_CHANNEL_TODO.md) -- that file is the
-authoritative status doc, this README only covers what is already
-hardware-proven (C3, the position bridge below).
+This project's target architecture is 4-channel bilateral teleoperation. The
+current status is maintained in
+[`validation_provenance/CURRENT_READINESS.md`](validation_provenance/CURRENT_READINESS.md).
+Historical audits and older trial reports are retained for provenance and must
+not be read as qualification of the current checkout. In particular, the
+corrected C1 sign and the current command-authority arrangement still require
+fresh controlled hardware evidence before unsupervised use.
 
 ## Calibration step
 
